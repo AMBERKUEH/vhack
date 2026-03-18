@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "esModuleInterop": true,
+    "outDir": ".scripts-out"
+  },
+  "include": ["scripts/**/*", "lib/**/*"]
+}

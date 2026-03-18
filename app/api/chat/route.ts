@@ -1,92 +1,89 @@
-import { NextResponse } from "next/server";
-import { getSupabaseAdmin, hasSupabaseEnv, isSimulationMode } from "@/lib/supabase";
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
 import { retrieveContext, buildRagPrompt } from "@/lib/rag";
-import { getOpenAIClient } from "@/lib/openai";
+import { createClient } from "@supabase/supabase-js";
 
-function streamFromText(text: string): ReadableStream<Uint8Array> {
-  return new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
-      let index = 0;
-      const chunks = text.split(" ");
-      const interval = setInterval(() => {
-        if (index >= chunks.length) {
-          clearInterval(interval);
-          controller.close();
-          return;
-        }
-        controller.enqueue(encoder.encode(`${chunks[index]} `));
-        index += 1;
-      }, 25);
-    },
-  });
-}
-
-export async function POST(req: Request): Promise<Response> {
+export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { question: string; businessId: string };
-    if (!body.question || !body.businessId) {
-      return NextResponse.json({ error: "question and businessId are required" }, { status: 400 });
+    const { question, businessId, language } = await req.json();
+
+    if (!question?.trim()) {
+      return NextResponse.json({ error: "Question is required" }, { status: 400 });
     }
 
-    if (isSimulationMode || !hasSupabaseEnv) {
-      const fallbackText =
-        "Untuk sijil halal JAKIM, anda perlukan SSM, lesen premis, senarai ramuan, dan SOP kebersihan. (Source: JAKIM - Halal Manual, p.14)";
-      return new Response(streamFromText(fallbackText), { headers: { "content-type": "text/plain; charset=utf-8" } });
-    }
-
-    const chunks = await retrieveContext(body.question);
-    const supabase = getSupabaseAdmin();
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("name,type,language_pref")
-      .eq("id", body.businessId)
-      .maybeSingle();
-
-    const prompt = buildRagPrompt(body.question, chunks);
-    const openai = getOpenAIClient();
-
-    if (!openai) {
-      const fallbackText =
-        "I don't have that info - check official website. (Source: JAKIM - Halal Manual, p.14)";
-      return new Response(streamFromText(fallbackText), { headers: { "content-type": "text/plain; charset=utf-8" } });
-    }
-
-    try {
-      const stream = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        stream: true,
-        messages: [
-          { role: "system", content: prompt.system },
-          {
-            role: "user",
-            content: `${prompt.user}\n\nBusiness Context: ${business?.name ?? "Unknown"} (${business?.type ?? "unknown"})`,
-          },
-        ],
-      });
+    if (process.env.SIMULATION_MODE === "true") {
+      const mockAnswer =
+        language === "bm"
+          ? "Untuk memohon Sijil Halal JAKIM, anda perlu mendaftar di portal MyHalal di halal.gov.my. Dokumen yang diperlukan termasuk sijil SSM, senarai produk, dan carta alir pengeluaran. Proses kelulusan mengambil masa 3-6 bulan. (Sumber: JAKIM - Prosedur Pensijilan Halal)"
+          : "To apply for JAKIM Halal certification, register at the MyHalal portal at halal.gov.my. Required documents include SSM certificate, product list, and production flowchart. Approval takes 3-6 months. (Source: JAKIM - Halal Certification Procedures)";
 
       const encoder = new TextEncoder();
-      const readable = new ReadableStream<Uint8Array>({
+      const words = mockAnswer.split(" ");
+      const readable = new ReadableStream({
         async start(controller) {
-          for await (const part of stream) {
-            const token = part.choices[0]?.delta?.content;
-            if (token) {
-              controller.enqueue(encoder.encode(token));
-            }
+          for (const word of words) {
+            controller.enqueue(encoder.encode(`${word} `));
+            await new Promise((resolve) => setTimeout(resolve, 40));
           }
           controller.close();
         },
       });
 
-      return new Response(readable, { headers: { "content-type": "text/plain; charset=utf-8" } });
-    } catch (error) {
-      console.warn("Streaming failed, using simulated response", error);
-      const fallbackText =
-        "I don't have that info - check official website. (Source: JAKIM - Halal Manual, p.14)";
-      return new Response(streamFromText(fallbackText), { headers: { "content-type": "text/plain; charset=utf-8" } });
+      return new Response(readable, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
     }
+
+    let businessContext: string | undefined;
+    if (businessId && businessId !== "mock-business-1") {
+      const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+      const { data } = await supabase
+        .from("businesses")
+        .select("type, location, employees, product_type")
+        .eq("id", businessId)
+        .single();
+
+      if (data) {
+        businessContext = `${data.type} business in ${data.location}, ${data.employees} employees, ${data.product_type}`;
+      }
+    }
+
+    const chunks = await retrieveContext(question);
+    const { system, user } = buildRagPrompt(question, chunks, businessContext);
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const stream = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      stream: true,
+      temperature: 0.3,
+      max_tokens: 600,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    });
+
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            const text = chunk.choices[0]?.delta?.content ?? "";
+            if (text) controller.enqueue(encoder.encode(text));
+          }
+        } catch (err) {
+          console.error("Streaming error:", err);
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(readable, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   } catch (error) {
-    console.error("/api/chat failed", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("Chat API error:", error);
+    return NextResponse.json({ error: "Chat unavailable. Please try again." }, { status: 500 });
   }
 }

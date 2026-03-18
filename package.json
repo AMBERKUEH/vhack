@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "seed": "tsx scripts/seed.ts",
-    "ingest-rag": "tsx scripts/ingest-rag.ts"
+    "ingest-rag": "ts-node --project tsconfig.scripts.json scripts/ingest-rag.ts",
+    "ingest-from-text": "ts-node --project tsconfig.scripts.json scripts/ingest-from-text.ts",
+    "verify-rag": "ts-node --project tsconfig.scripts.json scripts/verify-rag.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -19,6 +21,7 @@
     "@supabase/supabase-js": "^2.57.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^17.3.1",
     "lucide-react": "^0.577.0",
     "next": "14.2.32",
     "openai": "^6.7.0",
@@ -37,6 +40,7 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
+    "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }

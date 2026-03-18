@@ -1,87 +1,167 @@
-import type { ChunkResult } from "@/lib/types";
-import { getOpenAIClient } from "@/lib/openai";
-import { getSupabaseAdmin, isSimulationMode } from "@/lib/supabase";
+import OpenAI from "openai";
+import { createClient } from "@supabase/supabase-js";
 
-/**
- * Retrieves top context chunks from Supabase pgvector RPC.
- */
-export async function retrieveContext(question: string, topK = 5): Promise<ChunkResult[]> {
-  if (isSimulationMode) {
-    return [
-      {
-        source: "jakim",
-        doc_title: "JAKIM Halal Manual",
-        page_ref: "14",
-        content: "Permohonan halal memerlukan SSM, lesen premis, senarai bahan, dan proses kebersihan.",
-        similarity: 0.91,
-      },
-    ];
-  }
+export interface RagChunk {
+  source: string;
+  doc_title: string;
+  page_ref: string;
+  content: string;
+  similarity: number;
+}
 
-  const openai = getOpenAIClient();
-  if (!openai) {
-    return [
-      {
-        source: "jakim",
-        doc_title: "JAKIM Halal Manual",
-        page_ref: "14",
-        content: "Permohonan halal memerlukan SSM, lesen premis, senarai bahan, dan proses kebersihan.",
-        similarity: 0.91,
-      },
-    ];
-  }
+export interface RagPrompt {
+  system: string;
+  user: string;
+}
 
-  const embedding = await openai.embeddings.create({
-    model: "text-embedding-3-small",
-    input: question,
-  });
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const supabase =
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    : null;
 
-  const vector = embedding.data[0]?.embedding;
-  if (!vector) {
-    return [];
-  }
-
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.rpc("match_chunks", {
-    query_embedding: vector,
-    match_count: topK,
-  });
-
-  if (error) {
-    console.warn("RAG retrieval failed", error.message);
-    return [];
-  }
-
-  if (!data || data.length === 0) {
-    return [
-      {
-        source: "jakim",
-        doc_title: "JAKIM Halal Manual",
-        page_ref: "14",
-        content: "Permohonan halal memerlukan SSM, lesen premis, senarai bahan, dan proses kebersihan.",
-        similarity: 0.88,
-      },
-    ];
-  }
-
-  return data as ChunkResult[];
+function fallbackChunks(): RagChunk[] {
+  return [
+    {
+      source: "jakim",
+      doc_title: "Halal Certification Guide (fallback)",
+      page_ref: "general knowledge",
+      content: `JAKIM Halal certification in Malaysia requires:
+1. Company must be registered with SSM
+2. Submit application via MyHalal portal at halal.gov.my
+3. Required documents: SSM cert, product list, ingredient list,
+   production flow chart, premise layout, halal committee letter
+4. Site audit will be conducted by JAKIM officers
+5. Processing time: 3-6 months for new applications
+6. Certificate valid for 2 years, renewable 6 months before expiry
+7. Fee: RM200-2000 depending on company size
+Penalties for false halal claims: up to RM3 million or 5 years jail
+under Trade Descriptions Act 2011.`,
+      similarity: 0.5,
+    },
+    {
+      source: "lhdn",
+      doc_title: "SST Guide (fallback)",
+      page_ref: "general knowledge",
+      content: `SST (Sales and Service Tax) in Malaysia:
+Sales Tax: 5% or 10% on taxable goods
+Service Tax: 8% on taxable services (6% for F&B and telecoms)
+Registration threshold: RM500,000 annual taxable turnover
+Filing frequency: Every 2 months (bimonthly)
+Filing deadline: Last day of the month following the taxable period
+Late filing penalty: RM10,000 to RM50,000 or 10x the tax amount
+Payment via: MySST portal at mysst.customs.gov.my
+CP204 (tax estimate) must be submitted by month 3 of the basis year`,
+      similarity: 0.5,
+    },
+    {
+      source: "ssm",
+      doc_title: "Business Registration Guide (fallback)",
+      page_ref: "general knowledge",
+      content: `SSM Business Registration in Malaysia:
+Sole proprietorship / Partnership: register under Registration of Businesses Act 1956
+Private limited company (Sdn Bhd): register under Companies Act 2016
+Annual return must be filed within 30 days of AGM
+Failure to file annual return: compound fine up to RM50,000
+Business registration renewal: annual, fee RM30-60 depending on type
+Name search and reservation: via MyCoID portal at mycoID.ssm.com.my
+Beneficial ownership declaration required for Sdn Bhd companies
+Late renewal penalty: RM50 per month up to RM500`,
+      similarity: 0.5,
+    },
+  ];
 }
 
 /**
- * Builds system and user prompts for constrained RAG answering.
+ * Retrieve relevant context chunks from Supabase pgvector; fallback when unavailable.
  */
-export function buildRagPrompt(question: string, chunks: ChunkResult[]): { system: string; user: string } {
-  const contextBlocks = chunks
+export async function retrieveContext(
+  question: string,
+  topK = 5,
+  filterSource?: string,
+): Promise<RagChunk[]> {
+  try {
+    if (!openai || !supabase || process.env.SIMULATION_MODE === "true") {
+      return fallbackChunks();
+    }
+
+    const embeddingRes = await openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: question,
+    });
+
+    const embedding = embeddingRes.data[0]?.embedding;
+    if (!embedding) {
+      return fallbackChunks();
+    }
+
+    const { data, error } = await supabase.rpc("match_chunks", {
+      query_embedding: embedding,
+      match_count: topK,
+      filter_source: filterSource ?? null,
+    });
+
+    if (error || !data || data.length === 0) {
+      return fallbackChunks();
+    }
+
+    return data as RagChunk[];
+  } catch {
+    return fallbackChunks();
+  }
+}
+
+/**
+ * Build system and user prompts with retrieved regulation context.
+ */
+export function buildRagPrompt(
+  question: string,
+  chunks: RagChunk[],
+  businessContext?: string,
+): RagPrompt {
+  const context = chunks
     .map(
-      (chunk, index) =>
-        `[${index + 1}] Source: ${chunk.source.toUpperCase()} - ${chunk.doc_title}, p.${chunk.page_ref}\n${chunk.content}`,
+      (chunk, idx) =>
+        `${idx + 1}. [${chunk.source.toUpperCase()} - ${chunk.doc_title}, ${chunk.page_ref}]\n${chunk.content}`,
     )
     .join("\n\n");
 
-  const system =
-    "You are a Malaysian SME compliance advisor. Answer only from provided context. Cite source like (Source: LHDN - SST Guide, p.12). Respond in the same language as the user (BM or English). If answer is missing in context, say: I don't have that info - check official website.";
+  const system = [
+    "You are a compliance advisor for Malaysian SMEs.",
+    "You help business owners understand their regulatory requirements for SSM, LHDN, JAKIM, EPF, and local councils.",
+    "",
+    "IMPORTANT RULES:",
+    "- Answer ONLY using the context provided below",
+    "- Always cite your source at the end like:",
+    "  (Sumber / Source: LHDN - SST Guide, chunk 3 of 47)",
+    "- If the answer is not in the context, say exactly:",
+    "  \"Maklumat ini tiada dalam panduan saya. Sila semak",
+    "  laman web rasmi / This information is not in my guide.",
+    "  Please check the official website.\"",
+    "- Respond in the SAME language the user writes in",
+    "  (Bahasa Malaysia or English)",
+    "- Be specific about Malaysian regulations and RM amounts",
+    "- Keep answers concise - 3-5 bullet points when possible",
+    businessContext
+      ? `\nBUSINESS CONTEXT: ${businessContext}\nTailor your answer to this specific business type.`
+      : "",
+    "\nREGULATION CONTEXT:",
+    context,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  const user = `Question:\n${question}\n\nContext:\n${contextBlocks || "[No context available]"}`;
+  return {
+    system,
+    user: question,
+  };
+}
 
-  return { system, user };
+/**
+ * Extract top citation string from top-ranked chunk.
+ */
+export function extractCitation(chunks: RagChunk[]): string {
+  if (!chunks.length) return "";
+  const top = chunks[0];
+  return `(Source: ${top.source.toUpperCase()} - ${top.doc_title}, ${top.page_ref})`;
 }
