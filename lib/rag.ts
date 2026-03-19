@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { createEmbedding } from "./embeddings";
 import { createClient } from "@supabase/supabase-js";
 
 export interface RagChunk {
@@ -14,7 +14,6 @@ export interface RagPrompt {
   user: string;
 }
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 const supabase =
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
@@ -81,16 +80,11 @@ export async function retrieveContext(
   filterSource?: string,
 ): Promise<RagChunk[]> {
   try {
-    if (!openai || !supabase || process.env.SIMULATION_MODE === "true") {
+    if (!supabase || process.env.SIMULATION_MODE === "true") {
       return fallbackChunks();
     }
 
-    const embeddingRes = await openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: question,
-    });
-
-    const embedding = embeddingRes.data[0]?.embedding;
+    const embedding = await createEmbedding(question);
     if (!embedding) {
       return fallbackChunks();
     }
@@ -122,7 +116,8 @@ export function buildRagPrompt(
   const context = chunks
     .map(
       (chunk, idx) =>
-        `${idx + 1}. [${chunk.source.toUpperCase()} - ${chunk.doc_title}, ${chunk.page_ref}]\n${chunk.content}`,
+        `${idx + 1}. [${chunk.source.toUpperCase()} - ${chunk.doc_title}, ${chunk.page_ref}]
+${chunk.content}`,
     )
     .join("\n\n");
 
@@ -130,18 +125,16 @@ export function buildRagPrompt(
     "You are a compliance advisor for Malaysian SMEs.",
     "You help business owners understand their regulatory requirements for SSM, LHDN, JAKIM, EPF, and local councils.",
     "",
-    "IMPORTANT RULES:",
-    "- Answer ONLY using the context provided below",
-    "- Always cite your source at the end like:",
-    "  (Sumber / Source: LHDN - SST Guide, chunk 3 of 47)",
-    "- If the answer is not in the context, say exactly:",
-    "  \"Maklumat ini tiada dalam panduan saya. Sila semak",
-    "  laman web rasmi / This information is not in my guide.",
-    "  Please check the official website.\"",
-    "- Respond in the SAME language the user writes in",
-    "  (Bahasa Malaysia or English)",
-    "- Be specific about Malaysian regulations and RM amounts",
-    "- Keep answers concise - 3-5 bullet points when possible",
+    "CRITICAL RULES - FOLLOW EXACTLY:",
+    "1. Answer ONLY using the context provided below",
+    "2. Write naturally - NEVER repeat words or phrases",
+    "3. NEVER stutter or duplicate text like 'ToTo' or 'the the'",
+    "4. Use plain text only - NO markdown (*, **, -)",
+    "5. Write in short, clear sentences",
+    "6. Use numbers (1, 2, 3) for lists, NOT bullets",
+    "7. Always cite source at the end: (Sumber / Source: AGENCY - Document Name)",
+    "8. Respond in the SAME language as the user's question",
+    "9. If answer not in context, say: 'This information is not in my guide. Please check the official website.'",
     businessContext
       ? `\nBUSINESS CONTEXT: ${businessContext}\nTailor your answer to this specific business type.`
       : "",

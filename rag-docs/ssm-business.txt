@@ -1,0 +1,214 @@
+Application for incorporation
+14. (1) A person who desires to form a company shall apply for
+incorporation to the Registrar.
+(2) A company shall not be formed for any unlawful purpose.
+(3) The application for incorporation under this section shall
+include a statement by every person who desires to form a company
+containing the following particulars:
+(a) the name of the proposed company;
+(b) the status of whether the company is private or public;
+(c) the nature of business of the proposed company;
+(d) the proposed address of the registered office of the proposed
+company;
+(e) the name, identification, nationality and the ordinary place of
+residence of every person who is to be a member of the
+company and, where any of these persons is a body corporate,
+the corporate name, place of incorporation, registration
+number and the registered office of the body corporate;
+(f) the name, identification, nationality and the principal place
+of residence of every person who is to be a director;
+(g) the name, identification, nationality and the principal place
+of residence of the secretary, if any;
+(h) in the case of a company limited by shares, the details of class
+and number of shares to be taken by a member;
+(i) in the case of a company limited by guarantee, the amount up
+to which the member undertakes to contribute to the assets of
+the company in the event of its being wound up; and
+(j) any other information as the Registrar may require.
+(4) The application for incorporation shall be accompanied by a
+statement from each promoter or director confirming—
+(a) his consent to act as a promoter or to his appointment as a
+director, as the case may be; and
+(b) that he is not disqualified under this Act to act as a promoter
+or a director, as the case may be.
+Registration for incorporation
+15. If the Registrar is satisfied that the requirements of this Act as to
+the application for incorporation are complied with and upon payment
+of the prescribed fee, the Registrar shall—
+(a) enter the particulars of the company in the register;
+(b) assign a registration number to the company as its company
+registration number; and
+(c) issue a notice of registration in the form and manner as the
+Registrar may determine.
+Power to refuse registration of incorporation
+16. (1) Without prejudice to the powers of the Registrar under
+section 15, the Registrar shall not register an application unless he is
+satisfied that all the requirements of this Act in respect of the registration
+and any matter relating to the registration has been complied with.
+(2) The Registrar shall refuse to register the application of a
+proposed company where he is satisfied that the proposed company is
+likely to be used for an unlawful purpose or for purposes prejudicial to
+public order, morality or security of Malaysia.
+Certificate of incorporation
+17. Upon an application by a company and on payment of a prescribed
+fee, the Registrar may issue to the company a certificate of
+incorporation in the form and manner as the Registrar may determine.
+Effect of incorporation
+18. (1) Upon the date of incorporation specified in the notice of
+registration issued under section 15, there shall be a company by the
+name and registration number as stated in the principal register kept by
+the Registrar for this purpose.
+(2) Every person whose name is stated as a member in the
+application for incorporation and on the incorporation of the company
+shall be entered as members in the register of members, together with
+such other persons who may become members of the company from
+time to time, are a body corporate by the name stated in the notice of
+registration.
+(3) In the case of a company having a share capital, every person
+whose name is stated in the application for incorporation becomes the
+shareholder as specified in the application.
+(4) The details of the registered office of the company are as stated
+in, or in connection with, the application for registration.
+58 Laws of Malaysia ACT 777
+(5) The person named in the statement as a director or a secretary,
+if any, shall be deemed to have been appointed to that office.
+Notice of registration as conclusive evidence
+19. The notice of registration is conclusive evidence that the
+requirements of this Act in respect of registration and matters
+precedent and incidental to such registration have been complied with
+and that the company is duly registered under this Act.
+Separate legal entity
+20. A company incorporated under this Act is a body corporate and
+shall—
+(a) have legal personality separate from that of its members; and
+(b) continue in existence until it is removed from the register.
+Companies have unlimited capacity
+21. (1) A company shall be capable of exercising all the functions of
+a body corporate and have the full capacity to carry on or undertake
+any business or activity including—
+(a) to sue and be sued;
+(b) to acquire, own, hold, develop or dispose of any property;
+and
+(c) to do any act which it may do or to enter into transactions.
+(2) A company shall have the full rights, powers and privileges for
+the purposes mentioned in subsection (1).
+
+
+What Is an Annual Return (AR)?
+An Annual Return (AR) is a mandatory document that must be filed with the Companies Commission of Malaysia (SSM) yearly by registered companies in Malaysia. This comprehensive report provides a snapshot of your company’s essential details, ensuring transparency and keeping the authorities informed.
+
+Why Is Filing Annual Returns Important?
+Filing annual returns is important for several reasons. First and foremost, it guarantees your business operates compliantly. The SSM utilises these reports to verify your company’s legitimacy and adherence to regulations. Additionally, annual returns promote transparency. By submitting accurate information, you demonstrate responsible business practices, potentially fostering trust with investors, clients, and partners. Finally, timely filing helps you avoid potential penalties imposed by the SSM for late submissions.
+
+Filing Annual Returns
+Who Needs to File an Annual Return?
+All registered companies in Malaysia are required to file an annual return. This includes limited liability companies (LLCs), private companies limited by shares, companies limited by guarantee, and foreign companies registered to operate in Malaysia.
+
+What Information is Required in an Annual Return?
+Your annual return filing in Malaysia should include the following key details:
+
+Company Details: This section captures your company’s name, registration number, and registered office address.
+Business Activities: Briefly describe the core business activities your company undertakes.
+Director(s) Information: Provide the full names, identification numbers (IC/Passport), and residential addresses of all company directors.
+Company Secretary Information (if applicable): If your company has a designated company secretary, include their name, IC number, and residential address.
+Members’ Information (shareholding details): List all company members (shareholders) and their corresponding shareholding details.
+How to File an Annual Return?
+The company secretary should file, sign, and submit the annual return electronically through the Malaysian Business Reporting System (MBRS) in Malaysia, as this user-friendly system streamlines the process. To ensure accurate filing of annual returns, you should follow the below steps.
+
+Preparation with MBRS Preparation Tool (mTool)
+To start with the filing, you should first utilise the MBRS Preparation Tool (mTool) to prepare your annual return. This tool simplifies data entry and ensures consistency. You can download it from the MBRS Portal if needed.
+
+Once you have downloaded the mTool, use it to enter company details, director information, shareholding details, and other relevant information. Then, import your prepared financial statements, if applicable, into mTool for verification.
+Submission through MBRS Portal
+Once everything is prepared with mTool, you can begin your annual return submission through the MBRS Portal with the following steps:
+
+Log in to SSM4U and access the MBRS Portal.
+Create a new annual return submission.
+If you use mTool, upload the generated XBRL file directly into the portal. Alternatively, you can manually enter the data into the online form.
+Carefully review all information for accuracy before submission.
+Submit the annual return electronically and proceed to pay the filing fees online.
+Upon successful submission, you will receive a confirmation email with a reference number for your records.
+Deadlines and Due Dates of Annual Returns
+Companies are required to file your annual return within 30 days of your company’s anniversary date, which is the date your company was incorporated. In the case of a foreign company, the annual return due date will be on the company’s registered date. This deadline is independent of your financial year-end.
+
+It’s also crucial to double-check the deadlines and due dates with the SSM website for any change in regulations.
+
+Deadlines and Due Dates of Annual Returns
+Penalties for Late Filing
+Late filing of annual returns can result in fines imposed by the SSM. The severity of the penalties depends on the duration of the delay and whether the company is a private or public company.  These penalties must be paid during the delayed submissions of the documents to SSM.
+
+Furthermore, neglecting to file can lead to additional legal consequences, such as the SSM striking the company off the register. This can significantly impact your business operations, making it difficult to open bank accounts, enter into contracts, or maintain good legal standing.
+
+Based on the Companies Act 2016 in Malaysia, overseen by the Companies Commission of Malaysia (SSM), the sections regarding penalties often focus on maintaining accurate records, compliance with directors' duties, and proper filing of documents. 
+While specific subsections (e.g., 591-596) often relate to administrative penalties and offences in legal texts, the following are the general penalties for non-compliance with SSM regulations:
+Failure to File Annual Returns and Financial Statements: Failure to submit annual returns and financial statements constitutes one of the most frequent offences leading to legal action.
+Failure to Maintain Proper Accounting Records (Section 245): A company, its directors, and managers must make appropriate entries in accounting and other records within 60 days of the transaction and retain them for seven years. Failure to do so can lead to a fine of less than RM500,000, imprisonment for up to 3 years, or both.
+Improper Use of Words/Carrying Business Without Registration (Section 405): Carrying on business without registering or falsely holding out that a business is incorporated can result in a fine not exceeding RM50,000 or imprisonment for up to 2 years, or both.
+Failure to Notify Changes in Business Information: Failure to notify the Registrar of changes in company details (e.g., change of name, registered address) within designated periods (e.g., 14 to 30 days) can lead to penalties, including further fines of less than RM500 per day for continuing offences.
+Disqualification of Directors: Directors who engage in persistent default in delivering documents to the Registrar can be disqualified and fined up to RM10,000 or face up to 2 years imprisonment. 
+Common Non-Compliance Consequences:
+Compounds: Companies may be offered the chance to compound offences, which avoids prosecution but incurs a financial penalty.
+Prosecution: Failure to pay compoundable fees or severe negligence often results in SSM initiating direct court action against the company or its directors. 
+ 
+The Registration of Businesses Act 1956 (ROBA 1956) is the primary legislation for the registration and regulation of sole proprietorships and conventional partnerships in Peninsular Malaysia and the Federal Territory of Labuan. 
+Enterslice
+Enterslice
+ +1
+Core Provisions
+Mandatory Registration: Any person carrying on a business for profit must register with the Companies Commission of Malaysia (SSM) no later than 30 days from the date of commencement.
+Registration Validity: A new business registration is valid for a period of one to five years and must be renewed before its expiry.
+Business Types: It strictly covers two entity types:
+Sole Proprietorship: Owned by a single individual.
+Partnership: Owned by 2 to 20 individuals.
+Liability: Owners have unlimited personal liability, meaning they are personally responsible for all business debts and legal obligations. 
+Practical Law UK
+Practical Law UK
+ +4
+Eligibility Requirements
+Residency: Registration is restricted to Malaysian citizens or Permanent Residents. Foreigners cannot register businesses under this Act and must instead incorporate a company under the Companies Act 2016.
+Age: Business owners must be at least 18 years old.
+Location: The business must operate within Peninsular Malaysia or the Federal Territory of Labuan. 
+Post-Registration Obligations
+Display Certificate: The Business Registration Certificate must be prominently displayed at the business premises.
+Business Information: The business name and registration number must appear clearly on all official documents, including letters, invoices, and websites.
+Reporting Changes: Any changes to business details (e.g., address, nature of business, or partners) must be reported to SSM, typically within 30 days.
+Record Keeping: Proper accounting records must be maintained for at least seven years. 
+Exemptions from Registration
+Certain activities do not require registration under the Act, including: 
+Personal agricultural activities (e.g., rice, rubber, or livestock) provided the area is under 25 acres and employs five or fewer people.
+Selling at a fair for no more than two consecutive days in any week.
+Craftsmanship practiced on domestic premises without public display.
+Offenses and Penalties
+Operating an unregistered business or failing to comply with the Act is a criminal offense: 
+General Penalty: A fine of up to RM50,000, imprisonment for up to two years, or both.
+Contract Enforcement: Unregistered businesses may be legally unable to enforce contracts in court.
+
+Registration of a business in Malaysia under the Registration of Businesses Act 1956 is managed by the Companies Commission of Malaysia (SSM). Below are the specific details regarding fees, the registration process, and mandatory compliance requirements. 
+1. Business Registration Fees (Annual)
+Fees are determined by the type of business name used: 
+Personal Name: RM30.00 per year (e.g., Ali bin Ahmad) [1.2.1, 1.5.1].
+Trade Name: RM60.00 per year (e.g., Ali Catering Services) [1.2.1, 1.5.1].
+Branches: RM5.00 per year for each additional branch [1.2.1, 1.2.8].
+Business Information (Business Profile): RM10.00 [1.2.8]. 
+2. Step-by-Step Online Registration Process
+You can register entirely online through the SSM EzBiz Portal https://ezbiz.ssm.com.my/ [1.2.1]: 
+Account Creation: Register as a new user on the EzBiz Online portal [1.3.3].
+Identity Verification: One-time physical verification is required. You must visit the nearest SSM branch or use an SSM Tap.It kiosk to activate your account using your MyKad and thumbprint [1.3.3].
+New Business Application: Log in to EzBiz, go to "My Business Services," and select "New Business Registration (Form A)" [1.3.2].
+Fill in Details:
+Business Name: Choose either a personal or trade name.
+Commencement Date: Must be the actual start date (registration must occur within 30 days of this date).
+Principal Place of Business: The main operating address.
+Business Type: Describe the nature of your business activities.
+Payment: Pay the required fee via credit card or online banking [1.5.10].
+Approval: Once approved (usually within one working day), you can download and print your Business Registration Certificate (Form D) from the portal [1.2.2, 1.3.2]. 
+3. Mandatory Compliance & Legal Requirements
+Registration Deadline: You must register within 30 days of starting the business [1.2.2].
+Display Requirements: The registration certificate must be displayed in a conspicuous place at the business premises [1.5.9].
+Official Documents: The business name and registration number (e.g., 2024XXXXXXXX) must be printed on all invoices, receipts, and letterheads [1.5.9].
+Notification of Changes: Any change in address, business type, or partnership must be updated via Form B within 30 days [1.1.2, 1.2.8].
+Renewal: Registration must be renewed no later than 30 days before the expiry date [1.1.2].
+4. Penalties for Non-Compliance
+Failure to follow the Act can lead to severe consequences:
+Operating Without Registration: Fine up to RM50,000 or imprisonment up to two years, or both [1.2.2].
+Failure to Display Certificate: Criminal offense punishable by law [1.1.2].

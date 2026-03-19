@@ -1,0 +1,72 @@
+Here are the detailed tax obligations for businesses in Malaysia under the Inland Revenue Board (LHDN) and Royal Malaysian Customs Department (RMCD).
+1. Sales and Service Tax (SST) Registration
+The SST is a single-stage tax levied on specific goods and services. Registration is mandatory when the total value of taxable goods or services for a 12-month period exceeds the prescribed threshold.
+
+* Standard Threshold: RM500,000 annual turnover [(BoardRoom, 2025)](https://www.boardroomlimited.com/my/2025/06/17/malaysias-expanded-sales-and-services-tax-sst-takes-effect-on-1-july-2025/).
+* Service Tax Rate: Increased from 6% to 8% effective 1 March 2024 (excluding F&B, telecommunications, and logistics which remain at 6%) [(HSBC Business Go, 2025)](https://www.businessgo.hsbc.com/en/article/sales-and-service-tax-sst-in-malaysia-2024).
+* Specific Thresholds by Industry:
+* F&B Operators: RM1,500,000 [(PwC, n.d.)](https://www.pwc.com/my/en/publications/mtb/service-tax.html).
+   * Construction Work: RM1,500,000.
+   * Private Healthcare & Vet Services: RM1,500,000.
+   * Credit Card / Charge Card: No threshold (Registration is mandatory upon operation).
+   * Customs Agents: No threshold.
+* Registration Portal: Register online via the MySST Portal.
+
+2. CP204 Tax Installment Payment Schedule [1] 
+The CP204 is the estimate of tax payable for Companies, Limited Liability Partnerships (LLP), Trust Bodies, and Co-operatives. [1] 
+
+* Who Must File: Mandatory for Sdn Bhd, LLPs, and Co-ops. Sole proprietorships and partnerships generally do not file CP204 (they pay via CP500).
+* Filing Deadline:
+* New Business: Must submit within 3 months of commencing operations [(Lembaga Hasil Dalam Negeri Malaysia, 2024)](https://www.hasil.gov.my/en/company/tax-estimation/).
+   * Existing Business: Must submit 30 days before the beginning of the basis period for the Year of Assessment (YA) [(Grof, 2025)](https://grof.co/my/blog/lhdn-e-filing-deadline-2025-6-key-dates-for-sdn-bhd).
+* Installment Schedule:
+* Tax is paid in equal monthly installments.
+   * Start Date: Payments typically begin in the 6th month of the basis period for new companies, or the 2nd month for existing companies (transitional rules may apply) [(KTP & Company PLT, 2025)](https://www.ktp.com.my/blog/cp-204-tax-instalment-payment/6nov2025).
+   * Payment Deadline: By the 15th day of each month.
+* Underestimation Penalty: If the final tax payable exceeds the estimated tax (CP204) by more than 30%, a penalty of 10% is imposed on the difference [(Singapore Corporate Services, 2025)](https://scs-cpa.com/corporate-income-tax-malaysia-rates-filing-and-strategic-compliance/). [2, 3, 4, 5] 
+
+3. Employer Obligations: Form E & Form EA
+Employers are responsible for reporting employee remuneration to LHDN annually.
+
+* Form E (Employer's Return):
+* Purpose: Declares the total number of employees and list of employee income details to LHDN.
+   * Submission Deadline: 31 March of the following year [(Lembaga Hasil Dalam Negeri Malaysia, 2026)](https://www.hasil.gov.my/en/employers/).
+   * Mandatory e-Filing: Must be submitted via MyTax Portal.
+   * Failure to Submit: Offense under the Income Tax Act 1967, liable to fines or imprisonment.
+* Form EA (Employee's Statement of Remuneration):
+* Purpose: A statement provided to employees detailing their annual salary, bonuses, benefits-in-kind (BIK), and tax deductions.
+   * Distribution Deadline: Must be given to employees by 28 February of the following year (Grof, 2025).
+   * Required Details: Gross salary, PCB deducted, EPF/SOCSO contributions, and exempt allowances. [3, 6, 7, 8] 
+
+4. PCB (Monthly Tax Deduction) Rates & Threshold [9] 
+PCB (Potongan Cukai Berjadual) is a mechanism where employers deduct tax from employee salaries monthly. [10] 
+
+* Liability Threshold:
+* PCB deduction is mandatory if an employee's annual remuneration (after EPF deduction) exceeds RM34,000 (approx. RM2,833/month) [(AJobThing, 2025)](https://www.ajobthing.com/resources/blog/pcb-deduction-malaysia-guide).
+   * For married employees with a non-working spouse, the threshold is higher (approx. RM3,851/month).
+* Calculation Method:
+* Computerised Calculation (Recommended): Use the official [LHDN PCB Calculator](http://calcpcb.hasil.gov.my/) or payroll software (e.g., SQL Payroll, Kakitangan) to ensure accuracy.
+   * Manual Table (Reference): While LHDN provides a schedule, exact rates depend on category (Single/Married/Disabled) and number of children.
+* Payment Deadline: Deducted amounts must be remitted to LHDN by the 15th day of the following month (Lembaga Hasil Dalam Negeri Malaysia, 2026). [9] 
+
+Quick Summary Table
+
+| Obligation [3, 6, 9] | Form/Action | Deadline | Threshold/Notes |
+|---|---|---|---|
+| Sales Tax | SST-02 | Bi-monthly | >RM500k turnover (Standard) |
+| Est. Tax | CP204 | 30 days before basis period | Companies & LLPs only |
+| Employer | Form E | 31 March | Submit to LHDN |
+| Employee | Form EA | 28 February | Give to Employees |
+| Payroll Tax | PCB Payment | 15th of next month | If annual income >RM34k |
+
+
+[1] [https://www.hasil.gov.my](https://www.hasil.gov.my/en/company/tax-estimation/#:~:text=Submission%20of%20Estimated%20Tax%20Payable%20Under%20Section,starting%20from%20the%20Year%20of%20Assessment%202018.)
+[2] [https://grof.co](https://grof.co/my/blog/lhdn-e-filing-deadline-2025-6-key-dates-for-sdn-bhd#:~:text=CP204%20Form:%20File%20within%20three%20months%20of,report%20incentives%20provided%20to%20agents%20and%20distributors.)
+[3] [https://grof.co](https://grof.co/my/blog/lhdn-e-filing-deadline-2025-6-key-dates-for-sdn-bhd)
+[4] [https://www.ktp.com.my](https://www.ktp.com.my/blog/cp-204-tax-instalment-payment/6nov2025)
+[5] [https://www.hasil.gov.my](https://www.hasil.gov.my/en/company/tax-estimation/)
+[6] [https://www.hasil.gov.my](https://www.hasil.gov.my/media/forms/upload/form_f090f7b4-d0d5-41e3-9615-79a00b973bde/d7c8c297-bc05-4c42-a8d9-b0e054a66f6a/sample_of_form_e_2025_2.pdf)
+[7] [https://www.hasil.gov.my](https://www.hasil.gov.my/en/employers/)
+[8] [https://www.kwsp.gov.my](https://www.kwsp.gov.my/en/w/article/how-to-file-income-tax#:~:text=Have%20a%20gross%20annual%20income%20exceeding%20RM37%2C333,freelancers%20whose%20income%20exceeds%20the%20taxable%20threshold.)
+[9] [https://www.ajobthing.com](https://www.ajobthing.com/resources/blog/pcb-deduction-malaysia-guide#:~:text=PCB%20is%20only%20deducted%20if%20an%20employee%27s,monthly%20salary%20exceeds%20RM3%2C851%20after%20EPF%20deduction.)
+[10] [https://www.hasil.gov.my](https://www.hasil.gov.my/en/employers/)

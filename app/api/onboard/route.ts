@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { getOpenAIClient } from "@/lib/openai";
 import { getSupabaseAdmin, hasSupabaseEnv, isSimulationMode } from "@/lib/supabase";
 import { getRulesForBusiness } from "@/lib/compliance-rules";
 import { matchGrants } from "@/lib/grants";
 import { MOCK_BUSINESS, MOCK_GRANTS, MOCK_ITEMS } from "@/lib/mock";
 import type { BusinessProfile } from "@/lib/types";
+
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 function plusDays(days: number): string {
   const date = new Date();
@@ -33,6 +34,47 @@ const SIMULATED_PROFILE: BusinessProfile = {
   channels: ["offline", "online"],
 };
 
+async function extractBusinessProfile(prompt: string): Promise<Partial<BusinessProfile> | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const response = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              "Extract business info as JSON with fields: name, type (fnb/retail/manufacturing/services/ecommerce), location, state, employees (number), sells_online (boolean), is_food (boolean), product_type. Return only valid JSON.",
+          },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("Groq extraction failed:", response.status, await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (content) {
+      return JSON.parse(content) as Partial<BusinessProfile>;
+    }
+  } catch (error) {
+    console.warn("Business extraction failed:", error);
+  }
+  return null;
+}
+
 export async function POST(req: Request): Promise<NextResponse> {
   try {
     const body = (await req.json()) as { prompt: string; email: string };
@@ -51,40 +93,19 @@ export async function POST(req: Request): Promise<NextResponse> {
 
     let profile: BusinessProfile = SIMULATED_PROFILE;
 
-    const openai = getOpenAIClient();
-    if (openai) {
-      try {
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content:
-                "Extract business info as JSON with fields: name, type (fnb/retail/manufacturing/services/ecommerce), location, state, employees (number), sells_online (boolean), is_food (boolean), product_type. Return only valid JSON.",
-            },
-            { role: "user", content: body.prompt },
-          ],
-        });
-
-        const content = completion.choices[0]?.message?.content;
-        if (content) {
-          const parsed = JSON.parse(content) as Partial<BusinessProfile>;
-          profile = {
-            name: parsed.name ?? SIMULATED_PROFILE.name,
-            type: parsed.type ?? SIMULATED_PROFILE.type,
-            location: parsed.location ?? SIMULATED_PROFILE.location,
-            state: parsed.state ?? SIMULATED_PROFILE.state,
-            employees: Number(parsed.employees ?? SIMULATED_PROFILE.employees),
-            sells_online: Boolean(parsed.sells_online ?? SIMULATED_PROFILE.sells_online),
-            is_food: Boolean(parsed.is_food ?? SIMULATED_PROFILE.is_food),
-            product_type: parsed.product_type ?? SIMULATED_PROFILE.product_type,
-            channels: [parsed.sells_online ? "online" : "offline"],
-          };
-        }
-      } catch (error) {
-        console.warn("OpenAI extraction failed", error);
-      }
+    const extracted = await extractBusinessProfile(body.prompt);
+    if (extracted) {
+      profile = {
+        name: extracted.name ?? SIMULATED_PROFILE.name,
+        type: extracted.type ?? SIMULATED_PROFILE.type,
+        location: extracted.location ?? SIMULATED_PROFILE.location,
+        state: extracted.state ?? SIMULATED_PROFILE.state,
+        employees: Number(extracted.employees ?? SIMULATED_PROFILE.employees),
+        sells_online: Boolean(extracted.sells_online ?? SIMULATED_PROFILE.sells_online),
+        is_food: Boolean(extracted.is_food ?? SIMULATED_PROFILE.is_food),
+        product_type: extracted.product_type ?? SIMULATED_PROFILE.product_type,
+        channels: [extracted.sells_online ? "online" : "offline"],
+      };
     }
 
     const supabase = getSupabaseAdmin();
