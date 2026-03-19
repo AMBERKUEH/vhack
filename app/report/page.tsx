@@ -3,87 +3,219 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatRM, getRiskColour, getStatusFromRisk, type ComplianceItem, type ForecastItem, type RiskData } from "@/lib/risk";
 
-type ReportPayload = {
-  business: { id: string; name: string };
-  generated_at: string;
-  overall_score: number;
-  penalty_exposure: number;
-  items: Array<{ id: string; name: string; status: string; risk_score: number; deadline: string }>;
-  grants: Array<{ grant_name: string; value_rm: number; eligibility_pct: number }>;
+type Grant = {
+  grant_name: string;
+  grant_body: string;
+  value_rm: number;
+  eligibility_pct: number;
 };
 
+type ReportResponse = RiskData & {
+  business: {
+    id: string;
+    name: string;
+    type?: string;
+    location?: string;
+  };
+  grants: Grant[];
+  generated_at: string;
+};
+
+const MOCK_RISK: RiskData = {
+  overall_score: 72,
+  risk_level: "HIGH",
+  penalty_exposure: 72000,
+  items_at_risk: 4,
+  next_deadline: null,
+  items: [],
+  forecast: [] as ForecastItem[],
+};
+
+const MOCK_REPORT: ReportResponse = {
+  business: {
+    id: "mock-business-1",
+    name: "Warung Mak Jah",
+    type: "fnb",
+    location: "Subang Jaya",
+  },
+  ...MOCK_RISK,
+  grants: [
+    {
+      grant_name: "SME Digitalisation Grant",
+      grant_body: "MDEC",
+      value_rm: 5000,
+      eligibility_pct: 92,
+    },
+  ],
+  generated_at: new Date().toISOString(),
+};
+
+function SkeletonCard(): JSX.Element {
+  return <div className="h-24 animate-pulse rounded-lg bg-gray-200" />;
+}
+
 export default function ReportPage(): JSX.Element {
-  const [report, setReport] = useState<ReportPayload | null>(null);
-  const shareUrl = useMemo(() => `${typeof window !== "undefined" ? window.location.origin : ""}/report?share=demo`, []);
+  const [report, setReport] = useState<ReportResponse>(MOCK_REPORT);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    const business = localStorage.getItem("cc_business");
-    if (!business) return;
-    const businessId = (JSON.parse(business) as { id: string }).id;
+    const businessId = localStorage.getItem("compliance_copilot_business_id") ?? "mock-business-1";
 
     fetch(`/api/report?businessId=${businessId}`)
       .then((r) => r.json())
-      .then((d) => setReport(d as ReportPayload));
+      .then((data) => {
+        setReport((data as ReportResponse) ?? MOCK_REPORT);
+      })
+      .catch((err) => {
+        console.warn("Report fetch failed, using mock data:", err);
+        setReport(MOCK_REPORT);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  if (!report) return <main className="p-8">Loading report...</main>;
+  const scoreColour = useMemo(() => getRiskColour(report.overall_score), [report.overall_score]);
+
+  const copyLink = async (): Promise<void> => {
+    await navigator.clipboard.writeText(window.location.href);
+    setToast("Link copied to clipboard!");
+    setTimeout(() => setToast(null), 2000);
+  };
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-4 md:p-8 print:p-0">
-      <Card>
-        <CardHeader>
-          <CardTitle>Compliance Health Report</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p>Business: {report.business.name}</p>
-          <p>Overall Score: {report.overall_score}</p>
-          <p>Date: {new Date(report.generated_at).toLocaleString()}</p>
-          <p className="text-rose-600">Penalty Exposure: RM {report.penalty_exposure.toLocaleString()}</p>
-        </CardContent>
-      </Card>
+    <main className="mx-auto max-w-4xl space-y-4 px-4 py-6 md:px-8">
+      <style>{`@media print { .no-print { display: none; } }`}</style>
 
-      <Card>
-        <CardHeader><CardTitle>Compliance Items</CardTitle></CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="p-2 text-left">Item</th>
-                  <th className="p-2 text-left">Status</th>
-                  <th className="p-2 text-left">Risk</th>
-                  <th className="p-2 text-left">Deadline</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.items.map((item) => (
-                  <tr key={item.id} className="border-b">
-                    <td className="p-2">{item.name}</td>
-                    <td className="p-2">{item.status}</td>
-                    <td className="p-2">{item.risk_score}</td>
-                    <td className="p-2">{item.deadline}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="space-y-3">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      ) : (
+        <Card className="bg-white">
+          <CardHeader className="space-y-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-wide text-slate-500">Compliance Copilot - Health Report</p>
+                <CardTitle className="mt-2 text-3xl font-semibold text-slate-900">{report.business.name}</CardTitle>
+                <p className="text-sm text-slate-600">
+                  {report.business.type ?? "-"} | {report.business.location ?? "-"}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Generated: {new Date(report.generated_at).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })}
+                </p>
+              </div>
 
-      <Card>
-        <CardHeader><CardTitle>Eligible Grants</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          {report.grants.map((g) => (
-            <p key={g.grant_name}>{g.grant_name} - RM {g.value_rm.toLocaleString()} ({g.eligibility_pct}%)</p>
-          ))}
-        </CardContent>
-      </Card>
+              <div className="no-print flex gap-2">
+                <Button variant="outline" onClick={() => window.print()}>
+                  Download PDF
+                </Button>
+                <Button onClick={copyLink}>Share Report</Button>
+              </div>
+            </div>
+          </CardHeader>
 
-      <div className="flex flex-wrap gap-2 print:hidden">
-        <Button onClick={() => navigator.clipboard.writeText(shareUrl)}>Share Report</Button>
-        <Button variant="outline" onClick={() => window.print()}>Download PDF</Button>
-      </div>
+          <CardContent className="space-y-6">
+            <section className="rounded-lg border p-4">
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className={`text-5xl font-bold ${scoreColour.text}`}>{report.overall_score}</p>
+                  <p className={`text-sm font-semibold ${scoreColour.text}`}>{report.risk_level}</p>
+                </div>
+                <p className={`text-lg font-semibold ${report.penalty_exposure > 0 ? "text-red-700" : "text-green-700"}`}>
+                  {formatRM(report.penalty_exposure)}
+                </p>
+              </div>
+
+              <div className="mt-3 h-3 w-full rounded-full bg-slate-200">
+                <div
+                  className={`h-3 rounded-full ${scoreColour.bg.replace("100", "500").replace("200", "600")}`}
+                  style={{ width: `${Math.min(100, Math.max(0, report.overall_score))}%` }}
+                />
+              </div>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-700">Compliance Items</h2>
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-3 py-2">Item Name</th>
+                      <th className="px-3 py-2">Authority</th>
+                      <th className="px-3 py-2">Deadline</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Risk</th>
+                      <th className="px-3 py-2">Penalty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.items.map((item: ComplianceItem, idx) => {
+                      const status = getStatusFromRisk(item);
+                      const statusClass =
+                        status === "compliant"
+                          ? "text-green-700"
+                          : status === "expiring" || status === "uploaded"
+                            ? "text-orange-700"
+                            : "font-semibold text-red-700";
+
+                      return (
+                        <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="px-3 py-2">{item.name}</td>
+                          <td className="px-3 py-2">{item.authority}</td>
+                          <td className="px-3 py-2">{item.deadline ?? "-"}</td>
+                          <td className={`px-3 py-2 uppercase ${statusClass}`}>{status === "expiring" ? "EXPIRING SOON" : status}</td>
+                          <td className="px-3 py-2">{item.risk_score}</td>
+                          <td className="px-3 py-2">{formatRM(item.penalty_rm_min)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {report.forecast.length > 0 ? (
+              <section>
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-700">90-Day Forecast</h2>
+                <ul className="list-inside list-disc space-y-1 text-sm text-slate-700">
+                  {report.forecast.map((f) => (
+                    <li key={f.item_id}>In {f.days_until_flip} days - {f.item_name} will reach HIGH risk</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {report.grants.length > 0 ? (
+              <section>
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-700">Eligible Grants</h2>
+                <div className="space-y-1 text-sm">
+                  {report.grants.map((grant) => (
+                    <p key={`${grant.grant_name}-${grant.grant_body}`}>
+                      {grant.grant_name} - {formatRM(grant.value_rm)} ({grant.grant_body})
+                    </p>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            <footer className="border-t pt-3 text-xs text-slate-500">
+              <p>This report was generated by Compliance Copilot v2.</p>
+              <p>For official compliance advice, consult a qualified advisor.</p>
+              <p>{new Date(report.generated_at).toISOString()}</p>
+            </footer>
+          </CardContent>
+        </Card>
+      )}
+
+      {toast ? (
+        <div className="no-print fixed bottom-4 right-4 rounded-md bg-slate-900 px-3 py-2 text-sm text-white shadow-lg">
+          {toast}
+        </div>
+      ) : null}
     </main>
   );
 }

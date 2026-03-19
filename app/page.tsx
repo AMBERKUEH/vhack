@@ -39,7 +39,7 @@ export default function LandingPage(): JSX.Element {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-100 to-white px-4 py-8">
+    <main className="flex min-h-screen items-center justify-center px-4 py-8">
       <Card className="w-full max-w-3xl">
         <CardHeader>
           <CardTitle className="text-center text-3xl md:text-4xl">Compliance Copilot</CardTitle>
