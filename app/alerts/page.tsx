@@ -17,7 +17,18 @@ export default function AlertsPage(): JSX.Element {
   const submit = async (): Promise<void> => {
     const business = localStorage.getItem("cc_business");
     if (!business) return;
-    const businessId = (JSON.parse(business) as { id: string }).id;
+    const parsed = JSON.parse(business) as { id: string };
+
+    // If it's a demo/simulation ID, skip the API call
+    const isDemo = !parsed.id.match(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    );
+
+    if (isDemo) {
+      setMessage("Success: 3 alerts scheduled. (Demo mode)");
+      setTimeout(() => router.push("/dashboard"), 1200);
+      return;
+    }
 
     setLoading(true);
     setMessage(null);
@@ -25,7 +36,7 @@ export default function AlertsPage(): JSX.Element {
     const res = await fetch("/api/alerts", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ businessId, phone, language }),
+      body: JSON.stringify({ businessId: parsed.id, phone, language }),
     });
 
     const data = await res.json();
