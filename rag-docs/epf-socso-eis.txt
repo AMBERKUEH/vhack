@@ -1,0 +1,64 @@
+Managing employees in Malaysia requires registration with three statutory bodies: EPF, SOCSO, and EIS. These contributions are mandatory for all Malaysian employees (and some for foreigners).
+1. Contribution Rate Tables
+Rates are based on the employee's monthly wages (Salary + Allowances).
+A. EPF (Employees Provident Fund / KWSP)
+Calculated based on the Third Schedule of the EPF Act 1991.
+
+| Employee Age | Monthly Wages | Employee Rate | Employer Rate |
+|---|---|---|---|
+| Below 60 | RM5,000 & below | 11% | 13% |
+| Below 60 | Above RM5,000 | 11% | 12% |
+| 60 - 75 | Any amount | 0%* | 4% |
+
+*Note: Employees aged 60+ can choose to maintain their 11% contribution, but the statutory default is 0%.
+B. SOCSO (Social Security Organization / PERKESO)
+Employment Injury & Invalidity Scheme.
+
+| Category | Employee Rate | Employer Rate |
+|---|---|---|
+| Standard (Below 60) | ~0.5% | ~1.75% |
+| 60+ / New Joiners 55+ | 0% | ~1.25% (Injury Scheme only) |
+
+SOCSO uses a Contribution Salary Ceiling of RM6,000 (effective Oct 2024). Even if an employee earns RM10,000, the contribution is capped at the RM6,000 rate.
+C. EIS (Employment Insurance System / SIP)
+Protects employees in case of retrenchment.
+
+| Wage Level | Employee Rate | Employer Rate |
+|---|---|---|
+| All Employees | 0.2% | 0.2% |
+
+Like SOCSO, EIS is also capped at a RM6,000 salary ceiling.
+------------------------------
+2. Employer Registration Checklist
+You must register as an employer the moment you hire your first employee.
+EPF Registration (KWSP)
+
+* Action: Register via KWSP i-Akaun (Employer).
+* Documents Needed:
+* Section 17/Certificate of Incorporation (SSM Form D or Form 9).
+   * Identification: Copy of Director’s/Owner’s MyKad.
+   * Form KWSP 1: Employer Registration Form.
+* Deadline: Within 7 days of hiring the first employee.
+
+SOCSO & EIS Registration (PERKESO)
+
+* Action: Register via the PERKESO ASSIST Portal.
+* Documents Needed:
+* Employer Registration Form (Form 1).
+   * Employee Registration Form (Form 2).
+   * Business Profile: SSM Form D/Form 9.
+   * Director MyKad: Copy of the authorized person's ID.
+* Deadline: Within 30 days of hiring the first employee.
+
+------------------------------
+3. Monthly Payment Deadlines
+Failure to pay on time results in Late Payment Interest (LPI) and fines.
+
+* EPF: By the 15th of the following month.
+* SOCSO/EIS: By the 15th of the following month.
+
+4. Summary for SMEs
+
+* Wages include: Basic salary, overtime, commissions, paid leave, and most allowances.
+* Wages exclude: Service charges (tips), traveling allowances, and retirement gratuities.
+* Foreign Workers: EPF is optional but SOCSO is mandatory (Employer pays 1.25% for Employment Injury Scheme; Employee pays 0%).

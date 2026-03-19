@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { createEmbedding } from "../lib/embeddings";
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 
@@ -11,10 +11,9 @@ const TEST_QUERIES = [
 ] as const;
 
 const hasEnv = Boolean(
-  process.env.OPENAI_API_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
+  process.env.HUGGINGFACE_API_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 const supabase =
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
@@ -29,16 +28,11 @@ function mockRows(expected: string) {
 }
 
 async function runQuery(query: string, expected: string) {
-  if (!hasEnv || !openai || !supabase || process.env.SIMULATION_MODE === "true") {
+  if (!hasEnv || !supabase || process.env.SIMULATION_MODE === "true") {
     return mockRows(expected);
   }
 
-  const embed = await openai.embeddings.create({
-    model: "text-embedding-3-small",
-    input: query,
-  });
-
-  const vector = embed.data[0]?.embedding;
+  const vector = await createEmbedding(query);
   if (!vector) return [];
 
   const { data, error } = await supabase.rpc("match_chunks", {
@@ -66,15 +60,15 @@ async function main(): Promise<void> {
 
     console.log(`Query: "${test.q}"`);
     console.log("+-----------------------------------------------------+");
-    console.log("¦ Rank   ¦ Source       ¦ Similarity     ¦ Preview    ¦");
-    console.log("+--------+--------------+----------------+------------¦");
+    console.log("ï¿½ Rank   ï¿½ Source       ï¿½ Similarity     ï¿½ Preview    ï¿½");
+    console.log("+--------+--------------+----------------+------------ï¿½");
 
     rows.forEach((row, idx) => {
       const preview = row.content.replace(/\s+/g, " ").slice(0, 60);
       console.log(
-        `¦ ${String(idx + 1).padEnd(6, " ")} ¦ ${row.source.padEnd(12, " ")} ¦ ${row.similarity
+        `ï¿½ ${String(idx + 1).padEnd(6, " ")} ï¿½ ${row.source.padEnd(12, " ")} ï¿½ ${row.similarity
           .toFixed(2)
-          .padEnd(14, " ")} ¦ ${preview.padEnd(10, " ")} ¦`,
+          .padEnd(14, " ")} ï¿½ ${preview.padEnd(10, " ")} ï¿½`,
       );
       similaritySum += row.similarity;
       similarityCount += 1;

@@ -95,42 +95,42 @@ export default function ReportPage(): JSX.Element {
           <SkeletonCard />
         </div>
       ) : (
-        <Card className="bg-white">
+        <Card className="bg-neutral-900 border-neutral-800">
           <CardHeader className="space-y-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
-                <p className="text-sm uppercase tracking-wide text-slate-500">Compliance Copilot - Health Report</p>
-                <CardTitle className="mt-2 text-3xl font-semibold text-slate-900">{report.business.name}</CardTitle>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm uppercase tracking-wide text-neutral-500">Compliance Copilot - Health Report</p>
+                <CardTitle className="mt-2 text-3xl font-semibold text-white">{report.business.name}</CardTitle>
+                <p className="text-sm text-neutral-400">
                   {report.business.type ?? "-"} | {report.business.location ?? "-"}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-neutral-500">
                   Generated: {new Date(report.generated_at).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })}
                 </p>
               </div>
 
               <div className="no-print flex gap-2">
-                <Button variant="outline" onClick={() => window.print()}>
+                <Button variant="outline" onClick={() => window.print()} className="border-neutral-700 text-neutral-200 hover:bg-neutral-800">
                   Download PDF
                 </Button>
-                <Button onClick={copyLink}>Share Report</Button>
+                <Button onClick={copyLink} className="bg-blue-600 hover:bg-blue-700">Share Report</Button>
               </div>
             </div>
           </CardHeader>
 
           <CardContent className="space-y-6">
-            <section className="rounded-lg border p-4">
+            <section className="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
               <div className="flex items-end justify-between">
                 <div>
                   <p className={`text-5xl font-bold ${scoreColour.text}`}>{report.overall_score}</p>
                   <p className={`text-sm font-semibold ${scoreColour.text}`}>{report.risk_level}</p>
                 </div>
-                <p className={`text-lg font-semibold ${report.penalty_exposure > 0 ? "text-red-700" : "text-green-700"}`}>
+                <p className={`text-lg font-semibold ${report.penalty_exposure > 0 ? "text-red-400" : "text-green-400"}`}>
                   {formatRM(report.penalty_exposure)}
                 </p>
               </div>
 
-              <div className="mt-3 h-3 w-full rounded-full bg-slate-200">
+              <div className="mt-3 h-3 w-full rounded-full bg-neutral-800">
                 <div
                   className={`h-3 rounded-full ${scoreColour.bg.replace("100", "500").replace("200", "600")}`}
                   style={{ width: `${Math.min(100, Math.max(0, report.overall_score))}%` }}
@@ -139,17 +139,17 @@ export default function ReportPage(): JSX.Element {
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-700">Compliance Items</h2>
-              <div className="overflow-x-auto rounded-lg border">
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Compliance Items</h2>
+              <div className="overflow-x-auto rounded-lg border border-neutral-800">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50">
+                  <thead className="bg-neutral-950">
                     <tr>
-                      <th className="px-3 py-2">Item Name</th>
-                      <th className="px-3 py-2">Authority</th>
-                      <th className="px-3 py-2">Deadline</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Risk</th>
-                      <th className="px-3 py-2">Penalty</th>
+                      <th className="px-3 py-2 text-neutral-300">Item Name</th>
+                      <th className="px-3 py-2 text-neutral-300">Authority</th>
+                      <th className="px-3 py-2 text-neutral-300">Deadline</th>
+                      <th className="px-3 py-2 text-neutral-300">Status</th>
+                      <th className="px-3 py-2 text-neutral-300">Risk</th>
+                      <th className="px-3 py-2 text-neutral-300">Penalty</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -157,19 +157,19 @@ export default function ReportPage(): JSX.Element {
                       const status = getStatusFromRisk(item);
                       const statusClass =
                         status === "compliant"
-                          ? "text-green-700"
+                          ? "text-green-400"
                           : status === "expiring" || status === "uploaded"
-                            ? "text-orange-700"
-                            : "font-semibold text-red-700";
+                            ? "text-orange-400"
+                            : "font-semibold text-red-400";
 
                       return (
-                        <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="px-3 py-2">{item.name}</td>
-                          <td className="px-3 py-2">{item.authority}</td>
-                          <td className="px-3 py-2">{item.deadline ?? "-"}</td>
+                        <tr key={item.id} className={idx % 2 === 0 ? "bg-neutral-900" : "bg-neutral-950"}>
+                          <td className="px-3 py-2 text-neutral-200">{item.name}</td>
+                          <td className="px-3 py-2 text-neutral-400">{item.authority}</td>
+                          <td className="px-3 py-2 text-neutral-400">{item.deadline ?? "-"}</td>
                           <td className={`px-3 py-2 uppercase ${statusClass}`}>{status === "expiring" ? "EXPIRING SOON" : status}</td>
-                          <td className="px-3 py-2">{item.risk_score}</td>
-                          <td className="px-3 py-2">{formatRM(item.penalty_rm_min)}</td>
+                          <td className="px-3 py-2 text-neutral-400">{item.risk_score}</td>
+                          <td className="px-3 py-2 text-neutral-400">{formatRM(item.penalty_rm_min)}</td>
                         </tr>
                       );
                     })}

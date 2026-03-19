@@ -18,17 +18,17 @@ export default function ComplianceDetailPage(): JSX.Element {
       .then((d) => setItem((d.items ?? [])[0] ?? null));
   }, [params.id]);
 
-  if (!item) return <main className="p-8">Loading item...</main>;
+  if (!item) return <main className="p-8 text-neutral-300">Loading item...</main>;
 
   return (
     <main className="mx-auto max-w-4xl p-4 md:p-8">
-      <Card>
-        <CardHeader><CardTitle>{String(item.name)}</CardTitle></CardHeader>
+      <Card className="bg-neutral-900 border-neutral-800">
+        <CardHeader><CardTitle className="text-white">{String(item.name)}</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          <p>Authority: {String(item.authority ?? "-")}</p>
-          <p>Deadline: {String(item.deadline ?? "-")}</p>
-          <Badge variant="secondary">Status: {String(item.status ?? "pending")}</Badge>
-          <p className="text-sm text-muted-foreground">AI guide: Upload latest doc, verify expiry, and set alerts for 90/30/7 days.</p>
+          <p className="text-neutral-300">Authority: {String(item.authority ?? "-")}</p>
+          <p className="text-neutral-300">Deadline: {String(item.deadline ?? "-")}</p>
+          <Badge variant="secondary" className="bg-neutral-800 text-neutral-200">Status: {String(item.status ?? "pending")}</Badge>
+          <p className="text-sm text-neutral-500">AI guide: Upload latest doc, verify expiry, and set alerts for 90/30/7 days.</p>
         </CardContent>
       </Card>
     </main>

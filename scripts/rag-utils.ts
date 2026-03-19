@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { createEmbeddings } from "../lib/embeddings";
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 
@@ -15,13 +15,13 @@ export interface ChunkWithEmbedding extends Chunk {
   embedding: number[];
 }
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 const supabase =
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
     : null;
 
 const SIMULATION_MODE = process.env.SIMULATION_MODE === "true";
+const HF_API_KEY = process.env.HUGGINGFACE_API_KEY;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,9 +43,10 @@ function sourceLabel(source: string): string {
 }
 
 function deterministicEmbedding(text: string): number[] {
-  const vec = new Array<number>(1536).fill(0);
+  // Cohere embed-english-v3.0 produces 1024-dimensional vectors
+  const vec = new Array<number>(1024).fill(0);
   for (let i = 0; i < text.length; i += 1) {
-    const idx = i % 1536;
+    const idx = i % 1024;
     const code = text.charCodeAt(i);
     vec[idx] += (code % 97) / 97;
   }
@@ -135,10 +136,11 @@ export function chunkText(text: string, source: string, docTitle: string): Chunk
 }
 
 /**
- * Embed chunk content in batches using text-embedding-3-small with retry + backoff.
+ * Embed chunk content in batches using HuggingFace Inference API with retry + backoff.
+ * Note: HF free tier has rate limits, so we use smaller batches and longer delays.
  */
 export async function embedInBatches(chunks: Chunk[]): Promise<ChunkWithEmbedding[]> {
-  const batchSize = 100;
+  const batchSize = 8; // HF free tier works better with smaller batches
   const totalBatches = Math.ceil(chunks.length / batchSize);
   const embedded: ChunkWithEmbedding[] = [];
 
@@ -147,7 +149,7 @@ export async function embedInBatches(chunks: Chunk[]): Promise<ChunkWithEmbeddin
     const batchNo = Math.floor(i / batchSize) + 1;
     console.log(`Embedding batch ${batchNo}/${totalBatches} - ${batch.length} chunks`);
 
-    if (SIMULATION_MODE || !openai) {
+    if (SIMULATION_MODE || !HF_API_KEY) {
       embedded.push(
         ...batch.map((chunk) => ({
           ...chunk,
@@ -159,14 +161,11 @@ export async function embedInBatches(chunks: Chunk[]): Promise<ChunkWithEmbeddin
     }
 
     const doEmbed = async (): Promise<ChunkWithEmbedding[]> => {
-      const response = await openai.embeddings.create({
-        model: "text-embedding-3-small",
-        input: batch.map((chunk) => chunk.content),
-      });
+      const embeddings = await createEmbeddings(batch.map((chunk) => chunk.content));
 
       return batch.map((chunk, idx) => ({
         ...chunk,
-        embedding: response.data[idx]?.embedding ?? deterministicEmbedding(chunk.content),
+        embedding: embeddings[idx] ?? deterministicEmbedding(chunk.content),
       }));
     };
 
@@ -175,17 +174,25 @@ export async function embedInBatches(chunks: Chunk[]): Promise<ChunkWithEmbeddin
       embedded.push(...result);
     } catch (err) {
       console.warn(`Embedding failed for batch ${batchNo}, retrying once...`, err);
-      await sleep(2000);
+      await sleep(3000); // Longer wait for HF
       try {
         const retry = await doEmbed();
         embedded.push(...retry);
       } catch (retryErr) {
-        console.error(`Embedding batch ${batchNo} skipped after retry`, retryErr);
+        console.error(`Embedding batch ${batchNo} skipped after retry, using deterministic fallback`, retryErr);
+        // Use deterministic fallback for failed batch
+        embedded.push(
+          ...batch.map((chunk) => ({
+            ...chunk,
+            embedding: deterministicEmbedding(chunk.content),
+          })),
+        );
       }
     }
 
+    // HF free tier rate limiting - wait between batches
     if (i + batchSize < chunks.length) {
-      await sleep(600);
+      await sleep(1000);
     }
   }
 
@@ -260,17 +267,17 @@ export interface IngestionSummaryRow {
 export function printSummary(rows: IngestionSummaryRow[]): void {
   const total = rows.reduce((sum, row) => sum + row.chunks, 0);
   console.log("+-------------------------------------------------+");
-  console.log("¦ RAG INGESTION COMPLETE                          ¦");
-  console.log("+-------------------------------------------------¦");
-  console.log("¦ Source   ¦ Chunks    ¦ Document Title           ¦");
-  console.log("+----------+-----------+--------------------------¦");
+  console.log("ï¿½ RAG INGESTION COMPLETE                          ï¿½");
+  console.log("+-------------------------------------------------ï¿½");
+  console.log("ï¿½ Source   ï¿½ Chunks    ï¿½ Document Title           ï¿½");
+  console.log("+----------+-----------+--------------------------ï¿½");
   rows.forEach((row) => {
     const source = row.source.padEnd(8, " ");
     const chunks = String(row.chunks).padEnd(9, " ");
     const title = row.documentTitle.slice(0, 24).padEnd(24, " ");
-    console.log(`¦ ${source} ¦ ${chunks} ¦ ${title} ¦`);
+    console.log(`ï¿½ ${source} ï¿½ ${chunks} ï¿½ ${title} ï¿½`);
   });
-  console.log("+----------+-----------+--------------------------¦");
-  console.log(`¦ TOTAL    ¦ ${String(total).padEnd(9, " ")} ¦ ${"".padEnd(24, " ")} ¦`);
+  console.log("+----------+-----------+--------------------------ï¿½");
+  console.log(`ï¿½ TOTAL    ï¿½ ${String(total).padEnd(9, " ")} ï¿½ ${"".padEnd(24, " ")} ï¿½`);
   console.log("+-------------------------------------------------+");
 }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import { retrieveContext, buildRagPrompt } from "@/lib/rag";
 import { createClient } from "@supabase/supabase-js";
+
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 export async function POST(req: NextRequest) {
   try {
@@ -51,25 +52,67 @@ export async function POST(req: NextRequest) {
     const chunks = await retrieveContext(question);
     const { system, user } = buildRagPrompt(question, chunks, businessContext);
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const stream = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      stream: true,
-      temperature: 0.3,
-      max_tokens: 600,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
+    // Use Groq for chat completions
+    const groqResponse = await fetch(GROQ_API_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant", // Fast and cost-effective
+        stream: true,
+        temperature: 0.3,
+        max_tokens: 600,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
     });
 
+    if (!groqResponse.ok) {
+      const error = await groqResponse.text();
+      console.error("Groq API error:", error);
+      return NextResponse.json({ error: "Chat unavailable. Please try again." }, { status: 500 });
+    }
+
+    // Stream the response
+    const reader = groqResponse.body?.getReader();
     const encoder = new TextEncoder();
+    
     const readable = new ReadableStream({
       async start(controller) {
+        if (!reader) {
+          controller.close();
+          return;
+        }
+        
         try {
-          for await (const chunk of stream) {
-            const text = chunk.choices[0]?.delta?.content ?? "";
-            if (text) controller.enqueue(encoder.encode(text));
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            // Parse SSE format
+            const chunk = new TextDecoder().decode(value);
+            const lines = chunk.split("\n");
+            
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6);
+                if (data === "[DONE]") continue;
+                
+                try {
+                  const parsed = JSON.parse(data);
+                  const text = parsed.choices?.[0]?.delta?.content ?? "";
+                  if (text) {
+                    controller.enqueue(encoder.encode(text));
+                  }
+                } catch {
+                  // Skip invalid JSON
+                }
+              }
+            }
           }
         } catch (err) {
           console.error("Streaming error:", err);

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
 import {
   formatRM,
   getRiskColour,
@@ -155,25 +156,25 @@ function ComplianceItemCard({ item }: { item: ComplianceItem }): JSX.Element {
 
   return (
     <Link href={`/compliance/${item.id}`}>
-      <Card className="h-full border transition hover:shadow-md">
+      <Card className="h-full bg-neutral-900 border-neutral-800 transition hover:shadow-md hover:border-neutral-700">
         <CardContent className="space-y-3 p-4">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-sm font-semibold text-slate-900">{item.name}</h3>
+            <h3 className="text-sm font-semibold text-white">{item.name}</h3>
             <Badge className={`border ${badge.className}`}>{badge.label}</Badge>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{item.authority}</Badge>
+            <Badge variant="outline" className="border-neutral-700 text-neutral-300">{item.authority}</Badge>
             <Badge className={`${scoreColours.bg} ${scoreColours.text} ${scoreColours.border} border`}>
               Risk: {item.risk_score}
             </Badge>
           </div>
 
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-neutral-400">
             {due === null ? "No deadline set" : due <= 0 ? "EXPIRED" : `${due} days remaining`}
           </p>
 
-          {item.penalty_rm_min > 0 ? <p className="text-xs text-slate-500">Penalty: {formatRM(item.penalty_rm_min)}</p> : null}
+          {item.penalty_rm_min > 0 ? <p className="text-xs text-neutral-500">Penalty: {formatRM(item.penalty_rm_min)}</p> : null}
         </CardContent>
       </Card>
     </Link>
@@ -227,8 +228,8 @@ export default function DashboardPage(): JSX.Element {
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 pb-28 pt-6 md:px-8 md:pb-10">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold text-slate-900">Compliance Dashboard</h1>
-        <p className="text-sm text-slate-600">{businessName}</p>
+        <h1 className="text-2xl font-semibold text-white">Compliance Dashboard</h1>
+        <p className="text-sm text-neutral-400">{businessName}</p>
       </header>
 
       {loading ? (
@@ -250,56 +251,56 @@ export default function DashboardPage(): JSX.Element {
           <RiskGauge score={riskData.overall_score} animated />
 
           <section className="grid gap-4 md:grid-cols-3">
-            <Card>
+            <Card className="bg-neutral-900 border-neutral-800">
               <CardContent className="space-y-1 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Penalty Exposure</p>
-                <p className={`text-2xl font-bold ${riskData.penalty_exposure > 0 ? "text-red-700" : "text-green-700"}`}>
+                <p className="text-xs uppercase tracking-wide text-neutral-500">Penalty Exposure</p>
+                <p className={`text-2xl font-bold ${riskData.penalty_exposure > 0 ? "text-red-400" : "text-green-400"}`}>
                   {formatRM(riskData.penalty_exposure)}
                 </p>
-                <p className="text-xs text-slate-500">if all overdue items enforced today</p>
+                <p className="text-xs text-neutral-500">if all overdue items enforced today</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-neutral-900 border-neutral-800">
               <CardContent className="space-y-1 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Items at Risk</p>
-                <p className={`text-2xl font-bold ${riskData.items_at_risk > 0 ? "text-red-700" : "text-green-700"}`}>
+                <p className="text-xs uppercase tracking-wide text-neutral-500">Items at Risk</p>
+                <p className={`text-2xl font-bold ${riskData.items_at_risk > 0 ? "text-red-400" : "text-green-400"}`}>
                   {riskData.items_at_risk} of {riskData.items.length}
                 </p>
-                <p className="text-xs text-slate-500">Compliance items at risk</p>
+                <p className="text-xs text-neutral-500">Compliance items at risk</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-neutral-900 border-neutral-800">
               <CardContent className="space-y-1 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">Next Deadline</p>
+                <p className="text-xs uppercase tracking-wide text-neutral-500">Next Deadline</p>
                 <p
                   className={`text-2xl font-bold ${
                     riskData.next_deadline
                       ? riskData.next_deadline.days_away < 30
-                        ? "text-red-700"
+                        ? "text-red-400"
                         : riskData.next_deadline.days_away < 90
-                          ? "text-amber-700"
-                          : "text-green-700"
-                      : "text-slate-700"
+                          ? "text-amber-400"
+                          : "text-green-400"
+                      : "text-neutral-400"
                   }`}
                 >
                   {riskData.next_deadline ? `${riskData.next_deadline.days_away} days` : "No upcoming deadlines"}
                 </p>
-                <p className="text-xs text-slate-500">{riskData.next_deadline?.name ?? ""}</p>
+                <p className="text-xs text-neutral-500">{riskData.next_deadline?.name ?? ""}</p>
               </CardContent>
             </Card>
           </section>
 
           {topGrant ? (
-            <section className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <p>
+            <section className="rounded-lg border border-blue-900/50 bg-blue-950/30 p-4">
+              <p className="text-blue-200">
                 You qualify for <strong>{topGrant.grant_name}</strong>
               </p>
-              <p className="text-sm text-blue-900">
+              <p className="text-sm text-blue-300">
                 {formatRM(topGrant.value_rm)} available - {topGrant.eligibility_pct}% eligible
               </p>
-              <a href={topGrant.apply_url} target="_blank" className="mt-1 inline-block text-sm font-medium text-blue-700 underline">
+              <a href={topGrant.apply_url} target="_blank" className="mt-1 inline-block text-sm font-medium text-blue-400 underline">
                 Apply Now {">"}
               </a>
             </section>
@@ -307,15 +308,15 @@ export default function DashboardPage(): JSX.Element {
 
           {riskData.forecast.length > 0 ? (
             <section className="space-y-2">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-700">90-Day Risk Forecast</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">90-Day Risk Forecast</h2>
               <div className="overflow-x-auto">
                 <div className="flex gap-3 pb-1">
                   {riskData.forecast.map((forecast) => (
-                    <div key={forecast.item_id} className="min-w-[280px] rounded-md border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
+                    <div key={forecast.item_id} className="min-w-[280px] rounded-md border-l-4 border-amber-500 bg-amber-950/30 p-3 text-sm text-amber-200">
                       <p>
                         In {forecast.days_until_flip} days - {forecast.item_name} to HIGH risk
                       </p>
-                      <p className="text-xs text-amber-800">
+                      <p className="text-xs text-amber-400">
                         {forecast.authority} | {new Date(forecast.flip_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                       </p>
                     </div>
@@ -326,7 +327,7 @@ export default function DashboardPage(): JSX.Element {
           ) : null}
 
           <section className="space-y-3">
-            <h2 className="text-lg font-semibold text-slate-900">Your Compliance Items</h2>
+            <h2 className="text-lg font-semibold text-white">Your Compliance Items</h2>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {riskData.items.map((item) => (
                 <ComplianceItemCard key={item.id} item={item} />
@@ -336,20 +337,33 @@ export default function DashboardPage(): JSX.Element {
         </>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 p-3 backdrop-blur md:static md:border-none md:bg-transparent md:p-0">
-        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-2 md:grid-cols-4">
-          <Button asChild className="bg-violet-600 text-white hover:bg-violet-700">
-            <Link href="/upload">Upload Document</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/chat">Ask AI</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/alerts">Set Alerts</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/report">View Report</Link>
-          </Button>
+      {/* Floating Chat Button */}
+      <Link 
+        href="/chat" 
+        className="fixed bottom-6 right-6 z-50 flex h-20 w-20 items-center justify-center rounded-full bg-neutral-800/80 backdrop-blur-md text-neutral-300 border border-neutral-700 shadow-lg transition-all duration-500 ease-out hover:scale-110 hover:bg-gradient-to-b hover:from-blue-500/30 hover:via-blue-600/20 hover:to-blue-700/10 hover:border-blue-400/50 hover:text-white hover:shadow-[0_0_25px_rgba(59,130,246,0.5),0_0_50px_rgba(59,130,246,0.3)]"
+        aria-label="Ask AI"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 8V4H8"/>
+          <rect width="16" height="12" x="4" y="8" rx="2"/>
+          <path d="M2 14h2"/>
+          <path d="M20 14h2"/>
+          <path d="M15 13v2"/>
+          <path d="M9 13v2"/>
+        </svg>
+      </Link>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-900/95 p-3 backdrop-blur md:static md:border-none md:bg-transparent md:p-0">
+        <div className="mx-auto grid max-w-4xl grid-cols-3 gap-2 md:grid-cols-3">
+          <LiquidGlassButton variant="primary" className="w-full">
+            <Link href="/upload" className="flex items-center justify-center w-full">Upload Document</Link>
+          </LiquidGlassButton>
+          <LiquidGlassButton variant="outline" className="w-full">
+            <Link href="/alerts" className="flex items-center justify-center w-full">Set Alerts</Link>
+          </LiquidGlassButton>
+          <LiquidGlassButton variant="outline" className="w-full">
+            <Link href="/report" className="flex items-center justify-center w-full">View Report</Link>
+          </LiquidGlassButton>
         </div>
       </nav>
     </main>
