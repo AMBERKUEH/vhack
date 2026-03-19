@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuroraBackgroundWrapper } from "./aurora-wrapper";
 
 export const metadata: Metadata = {
   title: "Compliance Copilot v2",
@@ -9,7 +10,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuroraBackgroundWrapper>
+          {children}
+        </AuroraBackgroundWrapper>
+      </body>
     </html>
   );
 }
