@@ -1,145 +1,276 @@
-export type ItemPriority = "CRITICAL" | "HIGH" | "MEDIUM" | "GRANT";
+export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type ItemStatus = "compliant" | "uploaded" | "pending" | "expiring" | "expired" | "missing";
+export type Priority = "CRITICAL" | "HIGH" | "MEDIUM" | "GRANT";
 
 export interface ComplianceItem {
-  id?: string;
+  id: string;
+  business_id: string;
   name: string;
-  priority: ItemPriority;
+  authority: string;
+  deadline: string | null;
+  renewal_cycle: string;
+  status: ItemStatus;
+  risk_score: number;
+  priority: Priority;
   penalty_rm_min: number;
-  risk_score?: number;
+  penalty_rm_max: number;
+  notes?: string;
   document_uploaded?: boolean;
   expiry_date?: string | null;
 }
 
 export interface ForecastItem {
-  name: string;
+  item_id: string;
+  item_name: string;
+  authority: string;
   days_until_flip: number;
+  current_risk: number;
   projected_risk: number;
-  milestone: "T+30" | "T+60" | "T+90";
+  flip_date: string;
+  priority: Priority;
 }
 
-/**
- * Computes item-level risk based on document presence and expiry horizon.
- */
-export function getItemRisk(item: { document_uploaded: boolean; expiry_date: string | null }): number {
-  if (!item.document_uploaded || !item.expiry_date) {
-    return 100;
-  }
+export interface RiskData {
+  overall_score: number;
+  risk_level: RiskLevel;
+  penalty_exposure: number;
+  items_at_risk: number;
+  next_deadline: {
+    name: string;
+    days_away: number;
+    deadline: string;
+  } | null;
+  items: ComplianceItem[];
+  forecast: ForecastItem[];
+}
 
-  const expiry = new Date(item.expiry_date);
-  if (Number.isNaN(expiry.getTime())) {
-    return 100;
-  }
+function addDays(base: Date, days: number): Date {
+  const next = new Date(base);
+  next.setDate(next.getDate() + days);
+  return next;
+}
 
-  const now = new Date();
-  const diffDays = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+function computeItemRiskAtDate(
+  item: { document_uploaded?: boolean; expiry_date?: string | null; deadline?: string | null },
+  baseDate: Date,
+): number {
+  if (!item.document_uploaded) return 100;
 
-  if (diffDays < 0) return 100;
-  if (diffDays < 14) return 95;
-  if (diffDays < 30) return 80;
-  if (diffDays < 90) return 50;
-  if (diffDays < 180) return 25;
+  const daysLeft = daysBetween(baseDate, item.expiry_date ?? item.deadline ?? null);
+
+  if (daysLeft === null) return 80;
+  if (daysLeft < 0) return 100;
+  if (daysLeft < 14) return 95;
+  if (daysLeft < 30) return 80;
+  if (daysLeft < 90) return 50;
+  if (daysLeft < 180) return 25;
   return 10;
 }
 
 /**
- * Computes weighted overall compliance score.
+ * If toStr is null/undefined/empty or invalid date, returns null.
+ */
+export function daysBetween(from: Date, toStr: string | null | undefined): number | null {
+  if (!toStr) return null;
+  const to = new Date(toStr);
+  if (Number.isNaN(to.getTime())) return null;
+  return Math.floor((to.getTime() - from.getTime()) / 86400000);
+}
+
+/**
+ * Calculates risk score (0-100) for a single compliance item.
+ */
+export function getItemRisk(item: {
+  document_uploaded?: boolean;
+  expiry_date?: string | null;
+  deadline?: string | null;
+}): number {
+  return computeItemRiskAtDate(item, new Date());
+}
+
+/**
+ * Converts numeric score to risk level.
+ */
+export function getRiskLevel(score: number): RiskLevel {
+  if (score <= 30) return "LOW";
+  if (score <= 60) return "MEDIUM";
+  if (score <= 85) return "HIGH";
+  return "CRITICAL";
+}
+
+/**
+ * Weighted average score where CRITICAL=3x, HIGH=2x, MEDIUM=1x, GRANT=0x.
  */
 export function getOverallScore(items: ComplianceItem[]): number {
-  if (items.length === 0) {
-    return 0;
-  }
-
-  const weightMap: Record<ItemPriority, number> = {
+  const WEIGHTS: Record<Priority, number> = {
     CRITICAL: 3,
     HIGH: 2,
     MEDIUM: 1,
     GRANT: 0,
   };
 
-  let weightedSum = 0;
-  let totalWeight = 0;
+  const nonGrantItems = items.filter((item) => WEIGHTS[item.priority] > 0);
+  if (nonGrantItems.length === 0) return 0;
 
-  for (const item of items) {
-    const weight = weightMap[item.priority] ?? 1;
-    if (weight === 0) continue;
+  const totalWeight = nonGrantItems.reduce((sum, item) => sum + WEIGHTS[item.priority], 0);
+  const weightedSum = nonGrantItems.reduce((sum, item) => sum + item.risk_score * WEIGHTS[item.priority], 0);
 
-    const risk = item.risk_score ?? getItemRisk({
-      document_uploaded: Boolean(item.document_uploaded),
-      expiry_date: item.expiry_date ?? null,
-    });
-
-    weightedSum += risk * weight;
-    totalWeight += weight;
-  }
-
-  if (totalWeight === 0) return 0;
   return Math.round(weightedSum / totalWeight);
 }
 
 /**
- * Sums minimum penalty exposure for items currently high-risk.
+ * Total RM penalty exposure for high-risk items.
  */
 export function getPenaltyExposure(items: ComplianceItem[]): number {
-  return items.reduce((sum, item) => {
-    const risk = item.risk_score ?? getItemRisk({
-      document_uploaded: Boolean(item.document_uploaded),
-      expiry_date: item.expiry_date ?? null,
-    });
-
-    return risk >= 80 ? sum + (item.penalty_rm_min ?? 0) : sum;
-  }, 0);
-}
-
-function riskAtOffsetDays(expiryDate: string | null | undefined, offsetDays: number): number {
-  if (!expiryDate) return 100;
-  const expiry = new Date(expiryDate);
-  if (Number.isNaN(expiry.getTime())) return 100;
-
-  const future = new Date();
-  future.setDate(future.getDate() + offsetDays);
-  const diffDays = Math.ceil((expiry.getTime() - future.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) return 100;
-  if (diffDays < 14) return 95;
-  if (diffDays < 30) return 80;
-  if (diffDays < 90) return 50;
-  if (diffDays < 180) return 25;
-  return 10;
+  return items
+    .filter((item) => item.risk_score >= 80)
+    .reduce((sum, item) => sum + item.penalty_rm_min, 0);
 }
 
 /**
- * Projects near-term flips to HIGH risk (>=80) within 90 days.
+ * Returns the most urgent upcoming deadline.
+ */
+export function getNextDeadline(items: ComplianceItem[]): RiskData["next_deadline"] {
+  const today = new Date();
+
+  const upcoming = items
+    .filter((item) => {
+      const days = daysBetween(today, item.deadline);
+      return days !== null && days >= 0;
+    })
+    .sort((a, b) => new Date(a.deadline ?? 0).getTime() - new Date(b.deadline ?? 0).getTime());
+
+  const next = upcoming[0];
+  if (!next || !next.deadline) return null;
+
+  const daysAway = daysBetween(today, next.deadline);
+  if (daysAway === null) return null;
+
+  return {
+    name: next.name,
+    days_away: daysAway,
+    deadline: next.deadline,
+  };
+}
+
+/**
+ * Projects items that will flip to HIGH risk (>=80) within 90 days.
  */
 export function getForecast(items: ComplianceItem[]): ForecastItem[] {
-  const milestones: Array<{ days: number; label: ForecastItem["milestone"] }> = [
-    { days: 30, label: "T+30" },
-    { days: 60, label: "T+60" },
-    { days: 90, label: "T+90" },
-  ];
-
+  const checkpoints = [30, 60, 90];
+  const now = new Date();
   const forecast: ForecastItem[] = [];
 
   for (const item of items) {
-    const currentRisk = item.risk_score ?? getItemRisk({
-      document_uploaded: Boolean(item.document_uploaded),
-      expiry_date: item.expiry_date ?? null,
-    });
+    if (item.priority === "GRANT") continue;
 
-    for (const milestone of milestones) {
-      const projected = riskAtOffsetDays(item.expiry_date ?? null, milestone.days);
-      const flipsToHigh = currentRisk < 80 && projected >= 80;
+    const currentRisk = item.risk_score;
+    if (currentRisk >= 80) continue;
 
-      if (flipsToHigh) {
-        forecast.push({
-          name: item.name,
-          days_until_flip: milestone.days,
-          projected_risk: projected,
-          milestone: milestone.label,
-        });
+    let chosenT: number | null = null;
+    let projected = currentRisk;
+
+    for (const t of checkpoints) {
+      const futureDate = addDays(now, t);
+      const simulatedRisk = computeItemRiskAtDate(item, futureDate);
+      if (simulatedRisk >= 80) {
+        chosenT = t;
+        projected = simulatedRisk;
         break;
       }
     }
+
+    if (chosenT !== null) {
+      forecast.push({
+        item_id: item.id,
+        item_name: item.name,
+        authority: item.authority,
+        days_until_flip: chosenT,
+        current_risk: currentRisk,
+        projected_risk: projected,
+        flip_date: addDays(now, chosenT).toISOString(),
+        priority: item.priority,
+      });
+    }
   }
 
-  return forecast.sort((a, b) => a.days_until_flip - b.days_until_flip);
+  return forecast.sort((a, b) => a.days_until_flip - b.days_until_flip).slice(0, 5);
+}
+
+/**
+ * Builds full RiskData response payload.
+ */
+export function buildRiskData(items: ComplianceItem[]): RiskData {
+  const overall_score = getOverallScore(items);
+  return {
+    overall_score,
+    risk_level: getRiskLevel(overall_score),
+    penalty_exposure: getPenaltyExposure(items),
+    items_at_risk: items.filter((item) => item.risk_score >= 80).length,
+    next_deadline: getNextDeadline(items),
+    items,
+    forecast: getForecast(items),
+  };
+}
+
+/**
+ * Derives display status from upload + risk score.
+ */
+export function getStatusFromRisk(item: ComplianceItem): ItemStatus {
+  if (!item.document_uploaded) return "missing";
+  if (item.risk_score >= 100) return "expired";
+  if (item.risk_score >= 80) return "expiring";
+  if (item.risk_score >= 50) return "uploaded";
+  return "compliant";
+}
+
+/**
+ * Formats amount as Malaysian Ringgit.
+ */
+export function formatRM(amount: number): string {
+  return `RM ${amount.toLocaleString("en-MY")}`;
+}
+
+/**
+ * Returns semantic colour classes and hex by score.
+ */
+export function getRiskColour(score: number): {
+  bg: string;
+  text: string;
+  border: string;
+  hex: string;
+} {
+  if (score <= 30) {
+    return {
+      bg: "bg-green-100",
+      text: "text-green-800",
+      border: "border-green-300",
+      hex: "#16a34a",
+    };
+  }
+
+  if (score <= 60) {
+    return {
+      bg: "bg-amber-100",
+      text: "text-amber-800",
+      border: "border-amber-300",
+      hex: "#d97706",
+    };
+  }
+
+  if (score <= 85) {
+    return {
+      bg: "bg-red-100",
+      text: "text-red-800",
+      border: "border-red-300",
+      hex: "#dc2626",
+    };
+  }
+
+  return {
+    bg: "bg-red-200",
+    text: "text-red-900",
+    border: "border-red-500",
+    hex: "#991b1b",
+  };
 }
