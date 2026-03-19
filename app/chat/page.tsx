@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { PromptSuggestion } from "@/components/ui/prompt-suggestion";
 
 interface Message {
   role: "user" | "assistant";
@@ -111,43 +112,67 @@ export default function ChatPage(): JSX.Element {
 
   return (
     <main className="mx-auto max-w-4xl p-4 md:p-8">
-      <Card>
+      <Card className="bg-neutral-900 border-neutral-800">
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle>AI Compliance Assistant</CardTitle>
+            <CardTitle className="text-white">AI Compliance Assistant</CardTitle>
             <Tabs value={language} onValueChange={(v) => setLanguage(v as "bm" | "en")}>
-              <TabsList>
-                <TabsTrigger value="bm">BM</TabsTrigger>
-                <TabsTrigger value="en">English</TabsTrigger>
+              <TabsList className="bg-neutral-800">
+                <TabsTrigger value="bm" className="data-[state=active]:bg-neutral-700">BM</TabsTrigger>
+                <TabsTrigger value="en" className="data-[state=active]:bg-neutral-700">English</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Starter Questions - Rounded Full Pills */}
           <div className="flex flex-wrap gap-2">
             {starters.map((s) => (
-              <Button key={s} variant="outline" size="sm" onClick={() => ask(getStarterText(s))}>
+              <PromptSuggestion 
+                key={s}
+                onClick={() => ask(getStarterText(s))}
+                className="bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700 hover:text-white hover:border-neutral-600"
+              >
                 {getStarterText(s)}
-              </Button>
+              </PromptSuggestion>
             ))}
           </div>
 
-          <div className="h-[420px] space-y-3 overflow-y-auto rounded-md border p-3">
+          {/* Messages */}
+          <div className="h-[320px] space-y-3 overflow-y-auto rounded-md border border-neutral-800 bg-neutral-950 p-3">
             {messages.map((m, idx) => {
               const parsed = m.role === "assistant" ? parseMessage(m.text) : { text: m.text, source: null };
               return (
-                <div key={`${m.role}-${idx}`} className={`max-w-[85%] rounded-lg p-3 text-sm ${m.role === "user" ? "ml-auto bg-blue-600 text-white" : "bg-slate-100"}`}>
+                <div key={`${m.role}-${idx}`} className={`max-w-[85%] rounded-lg p-3 text-sm ${m.role === "user" ? "ml-auto bg-blue-600 text-white" : "bg-neutral-800 text-neutral-200"}`}>
                   <div className="whitespace-pre-wrap">{parsed.text || "..."}</div>
-                  {parsed.source ? <p className="mt-2 text-xs text-slate-500 italic">Source: {parsed.source}</p> : null}
+                  {parsed.source ? <p className="mt-2 text-xs text-neutral-500 italic">Source: {parsed.source}</p> : null}
                 </div>
               );
             })}
             <div ref={bottomRef} />
           </div>
 
+          {/* Simple Chat Input */}
           <div className="flex gap-2">
-            <Input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={language === "bm" ? "Tanya soalan pematuhan..." : "Ask a compliance question..."} />
-            <Button disabled={!question || loading} onClick={() => ask(question)}>{loading ? (language === "bm" ? "Berfikir..." : "Thinking...") : (language === "bm" ? "Hantar" : "Send")}</Button>
+            <Input 
+              value={question} 
+              onChange={(e) => setQuestion(e.target.value)} 
+              placeholder={language === "bm" ? "Tanya soalan pematuhan..." : "Ask a compliance question..."}
+              className="bg-neutral-950 border-neutral-800 text-white placeholder:text-neutral-500"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (question.trim()) ask(question);
+                }
+              }}
+            />
+            <Button 
+              disabled={!question || loading} 
+              onClick={() => ask(question)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {loading ? (language === "bm" ? "Berfikir..." : "Thinking...") : (language === "bm" ? "Hantar" : "Send")}
+            </Button>
           </div>
         </CardContent>
       </Card>

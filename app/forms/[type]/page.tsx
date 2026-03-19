@@ -34,9 +34,9 @@ export default function FormAutofillPage(): JSX.Element {
   if (submitted) {
     return (
       <main className="mx-auto max-w-3xl p-6">
-        <Card>
+        <Card className="bg-neutral-900 border-neutral-800">
           <CardContent className="py-10 text-center">
-            <p className="text-lg font-semibold">Permohonan anda telah dihantar. No. Rujukan: {submitted}</p>
+            <p className="text-lg font-semibold text-white">Permohonan anda telah dihantar. No. Rujukan: {submitted}</p>
           </CardContent>
         </Card>
       </main>
@@ -45,15 +45,15 @@ export default function FormAutofillPage(): JSX.Element {
 
   return (
     <main className="mx-auto max-w-3xl p-4 md:p-8">
-      <Card>
-        <CardHeader><CardTitle>Form Autofill: {params.type}</CardTitle></CardHeader>
+      <Card className="bg-neutral-900 border-neutral-800">
+        <CardHeader><CardTitle className="text-white">Form Autofill: {params.type}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {fields.map((field, idx) => (
             <div key={field.id}>
-              <label className="mb-1 block text-sm">{field.label}</label>
+              <label className="mb-1 block text-sm text-neutral-300">{field.label}</label>
               <Input
                 value={field.value ?? ""}
-                className={field.value ? "border-purple-300 bg-purple-50" : ""}
+                className={field.value ? "border-purple-500 bg-purple-950/30 text-white" : "bg-neutral-950 border-neutral-800 text-white"}
                 onChange={(e) => {
                   const next = [...fields];
                   next[idx] = { ...field, value: e.target.value };
@@ -62,7 +62,7 @@ export default function FormAutofillPage(): JSX.Element {
               />
             </div>
           ))}
-          <Button onClick={() => setSubmitted(trackingNo)}>Submit (Simulation)</Button>
+          <Button onClick={() => setSubmitted(trackingNo)} className="bg-blue-600 hover:bg-blue-700">Submit (Simulation)</Button>
         </CardContent>
       </Card>
     </main>

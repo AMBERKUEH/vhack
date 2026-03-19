@@ -40,18 +40,23 @@ export default function AlertsPage(): JSX.Element {
 
   return (
     <main className="mx-auto max-w-xl p-4 md:p-8">
-      <Card>
-        <CardHeader><CardTitle>WhatsApp Alert Setup</CardTitle></CardHeader>
+      <Card className="bg-neutral-900 border-neutral-800">
+        <CardHeader><CardTitle className="text-white">WhatsApp Alert Setup</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+60123456789" />
+          <Input 
+            value={phone} 
+            onChange={(e) => setPhone(e.target.value)} 
+            placeholder="+60123456789" 
+            className="bg-neutral-950 border-neutral-800 text-white placeholder:text-neutral-500"
+          />
           <Tabs value={language} onValueChange={(v) => setLanguage(v as "en" | "bm")}>
-            <TabsList>
-              <TabsTrigger value="bm">BM</TabsTrigger>
-              <TabsTrigger value="en">English</TabsTrigger>
+            <TabsList className="bg-neutral-800">
+              <TabsTrigger value="bm" className="data-[state=active]:bg-neutral-700">BM</TabsTrigger>
+              <TabsTrigger value="en" className="data-[state=active]:bg-neutral-700">English</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button onClick={submit} disabled={loading}>{loading ? "Saving..." : "Save Alerts"}</Button>
-          {message ? <p className="text-sm">{message}</p> : null}
+          <Button onClick={submit} disabled={loading} className="bg-blue-600 hover:bg-blue-700">{loading ? "Saving..." : "Save Alerts"}</Button>
+          {message ? <p className="text-sm text-neutral-300">{message}</p> : null}
         </CardContent>
       </Card>
     </main>

@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
 
 export default function LandingPage(): JSX.Element {
   const router = useRouter();
@@ -40,25 +40,31 @@ export default function LandingPage(): JSX.Element {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-8">
-      <Card className="w-full max-w-3xl">
+      <Card className="w-full max-w-3xl bg-neutral-900 border-neutral-800">
         <CardHeader>
-          <CardTitle className="text-center text-3xl md:text-4xl">Compliance Copilot</CardTitle>
-          <p className="text-center text-muted-foreground">
+          <CardTitle className="text-center text-3xl md:text-4xl text-white">Compliance Copilot</CardTitle>
+          <p className="text-center text-neutral-400">
             Ceritakan tentang perniagaan anda / Tell us about your business
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
-            className="min-h-[180px] text-base"
+            className="min-h-[180px] text-base bg-neutral-950 border-neutral-800 text-white placeholder:text-neutral-500"
             placeholder="Contoh: Saya jual nasi lemak kat Subang, ada 3 pekerja, jual online jugak..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="owner@email.com" />
-          <Button className="w-full" onClick={onSubmit} disabled={loading}>
+          <Input 
+            type="email" 
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)} 
+            placeholder="owner@email.com" 
+            className="bg-neutral-950 border-neutral-800 text-white placeholder:text-neutral-500"
+          />
+          <LiquidGlassButton className="w-full" onClick={onSubmit} disabled={loading}>
             {loading ? "Memproses..." : "Semak Compliance Saya >"}
-          </Button>
-          {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+          </LiquidGlassButton>
+          {error ? <p className="text-sm text-rose-400">{error}</p> : null}
         </CardContent>
       </Card>
     </main>

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
 
 type Profile = {
   id: string;
@@ -41,39 +41,39 @@ export default function OnboardingPage(): JSX.Element {
   };
 
   if (!profile) {
-    return <main className="p-8">Loading profile...</main>;
+    return <main className="p-8 text-neutral-300">Loading profile...</main>;
   }
 
   return (
     <main className="mx-auto max-w-4xl p-4 md:p-8">
-      <Card>
+      <Card className="bg-neutral-900 border-neutral-800">
         <CardHeader>
-          <CardTitle>Is this correct?</CardTitle>
+          <CardTitle className="text-white">Is this correct?</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {!edit ? (
             <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">{profile.type}</Badge>
-              <Badge>{profile.location}</Badge>
-              <Badge variant="outline">{profile.employees} employees</Badge>
+              <Badge variant="secondary" className="bg-neutral-800 text-neutral-200">{profile.type}</Badge>
+              <Badge className="bg-blue-600 text-white">{profile.location}</Badge>
+              <Badge variant="outline" className="border-neutral-700 text-neutral-300">{profile.employees} employees</Badge>
               {(profile.channels ?? []).map((channel) => (
-                <Badge key={channel} variant="secondary">{channel}</Badge>
+                <Badge key={channel} variant="secondary" className="bg-neutral-800 text-neutral-200">{channel}</Badge>
               ))}
-              <Badge>{profile.product_type}</Badge>
+              <Badge className="bg-blue-600 text-white">{profile.product_type}</Badge>
             </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
-              <Input value={profile.name} onChange={(e) => update("name", e.target.value)} />
-              <Input value={profile.type} onChange={(e) => update("type", e.target.value)} />
-              <Input value={profile.location} onChange={(e) => update("location", e.target.value)} />
-              <Input value={String(profile.employees)} onChange={(e) => update("employees", e.target.value)} />
-              <Input value={profile.product_type} onChange={(e) => update("product_type", e.target.value)} />
+              <Input value={profile.name} onChange={(e) => update("name", e.target.value)} className="bg-neutral-950 border-neutral-800 text-white" />
+              <Input value={profile.type} onChange={(e) => update("type", e.target.value)} className="bg-neutral-950 border-neutral-800 text-white" />
+              <Input value={profile.location} onChange={(e) => update("location", e.target.value)} className="bg-neutral-950 border-neutral-800 text-white" />
+              <Input value={String(profile.employees)} onChange={(e) => update("employees", e.target.value)} className="bg-neutral-950 border-neutral-800 text-white" />
+              <Input value={profile.product_type} onChange={(e) => update("product_type", e.target.value)} className="bg-neutral-950 border-neutral-800 text-white" />
             </div>
           )}
 
           <div className="flex gap-2">
-            <Button onClick={confirm}>Yes, looks right {">"}</Button>
-            <Button variant="outline" onClick={() => setEdit((v) => !v)}>{edit ? "Save" : "Edit"}</Button>
+            <LiquidGlassButton onClick={confirm} variant="primary">Yes, looks right {">"}</LiquidGlassButton>
+            <LiquidGlassButton onClick={() => setEdit((v) => !v)} variant="outline">{edit ? "Save" : "Edit"}</LiquidGlassButton>
           </div>
         </CardContent>
       </Card>

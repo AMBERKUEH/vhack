@@ -44,11 +44,11 @@ export default function UploadPage(): JSX.Element {
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-4 md:p-8">
-      <Card>
-        <CardHeader><CardTitle>Upload Document</CardTitle></CardHeader>
+      <Card className="bg-neutral-900 border-neutral-800">
+        <CardHeader><CardTitle className="text-white">Upload Document</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div
-            className="cursor-pointer rounded-lg border-2 border-dashed p-10 text-center"
+            className="cursor-pointer rounded-lg border-2 border-dashed border-neutral-700 bg-neutral-950 p-10 text-center hover:border-neutral-600"
             onDrop={(e) => {
               e.preventDefault();
               const dropped = e.dataTransfer.files[0];
@@ -57,8 +57,8 @@ export default function UploadPage(): JSX.Element {
             onDragOver={(e) => e.preventDefault()}
             onClick={() => inputRef.current?.click()}
           >
-            <p>Drag and drop PDF/JPG/PNG/HEIC here</p>
-            <p className="text-sm text-muted-foreground">or click to browse</p>
+            <p className="text-neutral-300">Drag and drop PDF/JPG/PNG/HEIC here</p>
+            <p className="text-sm text-neutral-500">or click to browse</p>
             <input
               ref={inputRef}
               className="hidden"
@@ -67,27 +67,27 @@ export default function UploadPage(): JSX.Element {
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
           </div>
-          {file ? <p className="text-sm">Selected: {file.name}</p> : null}
-          <Button onClick={onUpload} disabled={!file || loading}>{loading ? "Uploading..." : "Upload"}</Button>
-          {loading || progress > 0 ? <Progress value={progress} /> : null}
+          {file ? <p className="text-sm text-neutral-300">Selected: {file.name}</p> : null}
+          <Button onClick={onUpload} disabled={!file || loading} className="bg-blue-600 hover:bg-blue-700">{loading ? "Uploading..." : "Upload"}</Button>
+          {loading || progress > 0 ? <Progress value={progress} className="bg-neutral-800" /> : null}
         </CardContent>
       </Card>
 
       {result ? (
-        <Card>
-          <CardHeader><CardTitle>Extracted Fields</CardTitle></CardHeader>
+        <Card className="bg-neutral-900 border-neutral-800">
+          <CardHeader><CardTitle className="text-white">Extracted Fields</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <p>Document type: {result.extracted_data.document_type}</p>
-            <p>Company name: {result.extracted_data.company_name}</p>
-            <p>Reg no: {result.extracted_data.reg_no}</p>
-            <p>Expiry date: {result.extracted_data.expiry_date}</p>
-            <p>Authority: {result.extracted_data.issuing_authority}</p>
+            <p className="text-neutral-300">Document type: {result.extracted_data.document_type}</p>
+            <p className="text-neutral-300">Company name: {result.extracted_data.company_name}</p>
+            <p className="text-neutral-300">Reg no: {result.extracted_data.reg_no}</p>
+            <p className="text-neutral-300">Expiry date: {result.extracted_data.expiry_date}</p>
+            <p className="text-neutral-300">Authority: {result.extracted_data.issuing_authority}</p>
             <div className="flex flex-wrap gap-2">
               {result.anomaly_flags?.map((flag) => (
-                <Badge key={flag.issue} variant="warning">{flag.issue}</Badge>
+                <Badge key={flag.issue} variant="warning" className="bg-amber-900/50 text-amber-300 border-amber-800">{flag.issue}</Badge>
               ))}
             </div>
-            <Button onClick={() => router.push("/dashboard")}>Confirm & Save</Button>
+            <Button onClick={() => router.push("/dashboard")} className="bg-blue-600 hover:bg-blue-700">Confirm & Save</Button>
           </CardContent>
         </Card>
       ) : null}
