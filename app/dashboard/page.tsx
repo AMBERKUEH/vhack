@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
 import {
   formatRM,
@@ -22,41 +21,6 @@ type Grant = {
   eligibility_pct: number;
   apply_url: string;
 };
-
-const MOCK_RISK: RiskData = {
-  overall_score: 72,
-  risk_level: "HIGH",
-  penalty_exposure: 72000,
-  items_at_risk: 4,
-  next_deadline: {
-    name: "Premises Business Licence",
-    days_away: 45,
-    deadline: new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10),
-  },
-  items: [],
-  forecast: [
-    {
-      item_id: "forecast-1",
-      item_name: "JAKIM Halal Certification",
-      authority: "JAKIM",
-      days_until_flip: 34,
-      current_risk: 50,
-      projected_risk: 95,
-      flip_date: new Date(Date.now() + 34 * 86400000).toISOString(),
-      priority: "HIGH",
-    },
-  ],
-};
-
-const MOCK_GRANTS: Grant[] = [
-  {
-    grant_name: "SME Digitalisation Grant",
-    grant_body: "MDEC",
-    value_rm: 5000,
-    eligibility_pct: 92,
-    apply_url: "https://mdec.my/",
-  },
-];
 
 function easeOutQuad(t: number): number {
   return t * (2 - t);
@@ -182,33 +146,59 @@ function ComplianceItemCard({ item }: { item: ComplianceItem }): JSX.Element {
 }
 
 export default function DashboardPage(): JSX.Element {
-  const [riskData, setRiskData] = useState<RiskData>(MOCK_RISK);
-  const [grants, setGrants] = useState<Grant[]>(MOCK_GRANTS);
+  const [riskData, setRiskData] = useState<RiskData | null>(null);
+  const [grants, setGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const resolveBusinessId = (): string | null => {
+    const explicit = localStorage.getItem("compliance_copilot_business_id");
+    if (explicit) return explicit;
+    const raw = localStorage.getItem("cc_business");
+    if (!raw) return null;
+    try {
+      return (JSON.parse(raw) as { id?: string }).id ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const fetchDashboardData = async (businessId: string): Promise<void> => {
+    const [risk, grantData] = await Promise.all([
+      fetch(`/api/risk?businessId=${businessId}`).then(async (r) => {
+        if (!r.ok) throw new Error("Failed to fetch risk data");
+        return (await r.json()) as RiskData;
+      }),
+      fetch(`/api/grants?businessId=${businessId}`).then(async (r) => {
+        if (!r.ok) throw new Error("Failed to fetch grant data");
+        const data = await r.json();
+        return Array.isArray(data) ? (data as Grant[]) : ((data as { grants?: Grant[] }).grants ?? []);
+      }),
+    ]);
+
+    setRiskData(risk);
+    setGrants(grantData);
+    setError(null);
+  };
 
   useEffect(() => {
     let mounted = true;
-    const businessId = localStorage.getItem("compliance_copilot_business_id") ?? "mock-business-1";
+    const businessId = resolveBusinessId();
 
-    Promise.all([
-      fetch(`/api/risk?businessId=${businessId}`).then((r) => r.json()),
-      fetch(`/api/grants?businessId=${businessId}`).then((r) => r.json()),
-    ])
-      .then(([risk, grantData]) => {
+    if (!businessId) {
+      setError("No business found. Please complete onboarding first.");
+      setLoading(false);
+      return;
+    }
+
+    fetchDashboardData(businessId)
+      .then(() => {
         if (!mounted) return;
-        setRiskData((risk as RiskData) ?? MOCK_RISK);
-
-        const list = Array.isArray(grantData)
-          ? (grantData as Grant[])
-          : ((grantData as { grants?: Grant[] }).grants ?? MOCK_GRANTS);
-
-        setGrants(list.length > 0 ? list : MOCK_GRANTS);
       })
       .catch((err) => {
-        console.warn("Dashboard fetch failed, using mock data:", err);
+        console.error("Dashboard fetch failed:", err);
         if (!mounted) return;
-        setRiskData(MOCK_RISK);
-        setGrants(MOCK_GRANTS);
+        setError("Unable to load real dashboard data. Please check Supabase and API configuration.");
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -219,10 +209,27 @@ export default function DashboardPage(): JSX.Element {
     };
   }, []);
 
+  useEffect(() => {
+    const onRiskUpdated = (): void => {
+      const businessId = resolveBusinessId();
+      if (!businessId) return;
+      fetchDashboardData(businessId).catch((err) => {
+        console.error("Realtime refresh failed:", err);
+      });
+    };
+
+    window.addEventListener("compliance-risk-updated", onRiskUpdated);
+    window.addEventListener("storage", onRiskUpdated);
+    return () => {
+      window.removeEventListener("compliance-risk-updated", onRiskUpdated);
+      window.removeEventListener("storage", onRiskUpdated);
+    };
+  }, []);
+
   const topGrant = useMemo(() => grants[0], [grants]);
   const businessName = useMemo(() => {
-    if (typeof window === "undefined") return "Warung Mak Jah";
-    return localStorage.getItem("compliance_copilot_business_name") ?? "Warung Mak Jah";
+    if (typeof window === "undefined") return "-";
+    return localStorage.getItem("compliance_copilot_business_name") ?? "-";
   }, []);
 
   return (
@@ -246,6 +253,10 @@ export default function DashboardPage(): JSX.Element {
             <SkeletonCard />
           </div>
         </div>
+      ) : error || !riskData ? (
+        <Card className="border-neutral-800 bg-neutral-900">
+          <CardContent className="p-4 text-sm text-rose-300">{error ?? "Failed to load dashboard data."}</CardContent>
+        </Card>
       ) : (
         <>
           <RiskGauge score={riskData.overall_score} animated />

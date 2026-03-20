@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
-CREATE TABLE businesses (
+CREATE TABLE IF NOT EXISTS businesses (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name          TEXT NOT NULL,
   type          TEXT CHECK (type IN ('fnb','retail','manufacturing','services','ecommerce')),
@@ -16,7 +16,7 @@ CREATE TABLE businesses (
   created_at    TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE compliance_items (
+CREATE TABLE IF NOT EXISTS compliance_items (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id    UUID REFERENCES businesses(id) ON DELETE CASCADE,
   name           TEXT NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE compliance_items (
   notes          TEXT
 );
 
-CREATE TABLE documents (
+CREATE TABLE IF NOT EXISTS documents (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id        UUID REFERENCES businesses(id) ON DELETE CASCADE,
   compliance_item_id UUID REFERENCES compliance_items(id),
@@ -42,7 +42,7 @@ CREATE TABLE documents (
   uploaded_at        TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE risk_events (
+CREATE TABLE IF NOT EXISTS risk_events (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
   event_type  TEXT,
@@ -52,7 +52,7 @@ CREATE TABLE risk_events (
   created_at  TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE rag_chunks (
+CREATE TABLE IF NOT EXISTS rag_chunks (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   source     TEXT,
   doc_title  TEXT,
@@ -61,9 +61,9 @@ CREATE TABLE rag_chunks (
   embedding  vector(1536),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-CREATE INDEX ON rag_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS rag_chunks_embedding_idx ON rag_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
-CREATE TABLE grant_matches (
+CREATE TABLE IF NOT EXISTS grant_matches (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id     UUID REFERENCES businesses(id) ON DELETE CASCADE,
   grant_name      TEXT,

@@ -4,6 +4,25 @@ import { createClient } from "@supabase/supabase-js";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildFallbackFromChunks(question: string, chunks: Array<{ source: string; doc_title: string; page_ref: string; content: string }>): string {
+  if (!chunks.length) {
+    return "This information is not in my guide. Please check the official website.";
+  }
+  const top = chunks[0];
+  const preview = top.content.replace(/\s+/g, " ").slice(0, 420);
+  return [
+    `Based on available guidance, here is the most relevant context for: "${question}"`,
+    "",
+    preview,
+    "",
+    `(Source: ${top.source.toUpperCase()} - ${top.doc_title}, ${top.page_ref})`,
+  ].join("\n");
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { question, businessId, language } = await req.json();
@@ -52,29 +71,47 @@ export async function POST(req: NextRequest) {
     const chunks = await retrieveContext(question);
     const { system, user } = buildRagPrompt(question, chunks, businessContext);
 
-    // Use Groq for chat completions
-    const groqResponse = await fetch(GROQ_API_URL, {
+    const body = JSON.stringify({
+      model: "llama-3.1-8b-instant",
+      stream: true,
+      temperature: 0.2,
+      max_tokens: 280,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    });
+
+    let groqResponse = await fetch(GROQ_API_URL, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant", // Fast and cost-effective
-        stream: true,
-        temperature: 0.3,
-        max_tokens: 600,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      }),
+      body,
     });
+
+    if (!groqResponse.ok && groqResponse.status === 429) {
+      const retryAfter = Number(groqResponse.headers.get("retry-after") ?? "2");
+      await sleep(Math.max(2000, retryAfter * 1000));
+      groqResponse = await fetch(GROQ_API_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+    }
 
     if (!groqResponse.ok) {
       const error = await groqResponse.text();
       console.error("Groq API error:", error);
-      return NextResponse.json({ error: "Chat unavailable. Please try again." }, { status: 500 });
+      const fallback = buildFallbackFromChunks(question, chunks);
+      return new Response(fallback, {
+        status: 200,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
     }
 
     // Stream the response

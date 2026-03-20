@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin, hasSupabaseEnv, isSimulationMode } from "@/lib/supabase";
+import { getSupabaseAdmin, hasSupabaseEnv } from "@/lib/supabase";
 import { getRulesForBusiness } from "@/lib/compliance-rules";
 import { matchGrants } from "@/lib/grants";
-import { MOCK_BUSINESS, MOCK_GRANTS, MOCK_ITEMS } from "@/lib/mock";
 import type { BusinessProfile } from "@/lib/types";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -21,18 +20,6 @@ function deadlineFromCycle(cycle: string): string {
   if (cycle === "one-time") return plusDays(3650);
   return plusDays(365);
 }
-
-const SIMULATED_PROFILE: BusinessProfile = {
-  name: "Warung Mak Jah",
-  type: "fnb",
-  location: "Subang Jaya",
-  state: "Selangor",
-  employees: 3,
-  sells_online: true,
-  is_food: true,
-  product_type: "halal food",
-  channels: ["offline", "online"],
-};
 
 async function extractBusinessProfile(prompt: string): Promise<Partial<BusinessProfile> | null> {
   const apiKey = process.env.GROQ_API_KEY;
@@ -82,95 +69,166 @@ export async function POST(req: Request): Promise<NextResponse> {
       return NextResponse.json({ error: "prompt and email are required" }, { status: 400 });
     }
 
-    if (isSimulationMode || !hasSupabaseEnv) {
-      return NextResponse.json({
-        business: { ...MOCK_BUSINESS, owner_email: body.email, raw_prompt: body.prompt },
-        compliance_items: MOCK_ITEMS,
-        grant_matches: MOCK_GRANTS,
-        simulated: true,
-      });
+    if (!hasSupabaseEnv) {
+      return NextResponse.json({ error: "Supabase environment is missing" }, { status: 500 });
     }
 
-    let profile: BusinessProfile = SIMULATED_PROFILE;
+    let profile: BusinessProfile = {
+      name: "New Business",
+      type: "services",
+      location: "Malaysia",
+      state: "Unknown",
+      employees: 0,
+      sells_online: false,
+      is_food: false,
+      product_type: "general",
+      channels: ["offline"],
+    };
 
     const extracted = await extractBusinessProfile(body.prompt);
     if (extracted) {
       profile = {
-        name: extracted.name ?? SIMULATED_PROFILE.name,
-        type: extracted.type ?? SIMULATED_PROFILE.type,
-        location: extracted.location ?? SIMULATED_PROFILE.location,
-        state: extracted.state ?? SIMULATED_PROFILE.state,
-        employees: Number(extracted.employees ?? SIMULATED_PROFILE.employees),
-        sells_online: Boolean(extracted.sells_online ?? SIMULATED_PROFILE.sells_online),
-        is_food: Boolean(extracted.is_food ?? SIMULATED_PROFILE.is_food),
-        product_type: extracted.product_type ?? SIMULATED_PROFILE.product_type,
+        name: extracted.name ?? profile.name,
+        type: extracted.type ?? profile.type,
+        location: extracted.location ?? profile.location,
+        state: extracted.state ?? profile.state,
+        employees: Number(extracted.employees ?? profile.employees),
+        sells_online: Boolean(extracted.sells_online ?? profile.sells_online),
+        is_food: Boolean(extracted.is_food ?? profile.is_food),
+        product_type: extracted.product_type ?? profile.product_type,
         channels: [extracted.sells_online ? "online" : "offline"],
       };
     }
 
     const supabase = getSupabaseAdmin();
-    const { data: business, error: businessError } = await supabase
+
+    const { data: existingBusiness, error: existingBusinessError } = await supabase
       .from("businesses")
-      .insert({
-        name: profile.name,
-        type: profile.type,
-        location: profile.location,
-        state: profile.state,
-        council: profile.location?.includes("Subang") ? "MBPJ" : "Unknown Council",
-        employees: profile.employees,
-        channels: profile.channels ?? [profile.sells_online ? "online" : "offline"],
-        product_type: profile.product_type,
-        raw_prompt: body.prompt,
-        owner_email: body.email,
-        language_pref: "en",
-      })
       .select("*")
-      .single();
+      .eq("owner_email", body.email)
+      .maybeSingle();
 
-    if (businessError || !business) {
-      return NextResponse.json({ error: businessError?.message ?? "Failed to save business" }, { status: 500 });
+    if (existingBusinessError) {
+      return NextResponse.json({ error: existingBusinessError.message }, { status: 500 });
     }
 
-    const rules = getRulesForBusiness(profile);
-    const rows = rules.map((rule) => ({
-      business_id: business.id,
-      name: rule.name,
-      authority: rule.authority,
-      deadline: deadlineFromCycle(rule.renewal_cycle),
-      renewal_cycle: rule.renewal_cycle,
-      status: "pending",
-      risk_score: 100,
-      priority: rule.priority,
-      penalty_rm_min: rule.penalty_rm_min,
-      penalty_rm_max: rule.penalty_rm_max,
-      notes: null,
-    }));
+    let business = existingBusiness;
 
-    const { data: complianceItems, error: itemsError } = await supabase.from("compliance_items").insert(rows).select("*");
-    if (itemsError) {
-      return NextResponse.json({ error: itemsError.message }, { status: 500 });
+    if (business) {
+      const { data: updated, error: updateError } = await supabase
+        .from("businesses")
+        .update({
+          name: profile.name,
+          type: profile.type,
+          location: profile.location,
+          state: profile.state,
+          council: profile.location?.includes("Subang") ? "MBPJ" : "Unknown Council",
+          employees: profile.employees,
+          channels: profile.channels ?? [profile.sells_online ? "online" : "offline"],
+          product_type: profile.product_type,
+          raw_prompt: body.prompt,
+          language_pref: "en",
+        })
+        .eq("id", business.id)
+        .select("*")
+        .single();
+
+      if (updateError || !updated) {
+        return NextResponse.json({ error: updateError?.message ?? "Failed to update business" }, { status: 500 });
+      }
+      business = updated;
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from("businesses")
+        .insert({
+          name: profile.name,
+          type: profile.type,
+          location: profile.location,
+          state: profile.state,
+          council: profile.location?.includes("Subang") ? "MBPJ" : "Unknown Council",
+          employees: profile.employees,
+          channels: profile.channels ?? [profile.sells_online ? "online" : "offline"],
+          product_type: profile.product_type,
+          raw_prompt: body.prompt,
+          owner_email: body.email,
+          language_pref: "en",
+        })
+        .select("*")
+        .single();
+
+      if (insertError || !inserted) {
+        return NextResponse.json({ error: insertError?.message ?? "Failed to save business" }, { status: 500 });
+      }
+      business = inserted;
     }
 
-    const grants = matchGrants({ ...profile, owner_bumiputera: false, is_tech_startup: false });
-    const { data: grantRows, error: grantsError } = await supabase
+    const { data: existingItems, error: existingItemsError } = await supabase
+      .from("compliance_items")
+      .select("*")
+      .eq("business_id", business.id);
+
+    if (existingItemsError) {
+      return NextResponse.json({ error: existingItemsError.message }, { status: 500 });
+    }
+
+    let complianceItems = existingItems ?? [];
+    if (!complianceItems.length) {
+      const rules = getRulesForBusiness(profile);
+      const rows = rules.map((rule) => ({
+        business_id: business.id,
+        name: rule.name,
+        authority: rule.authority,
+        deadline: deadlineFromCycle(rule.renewal_cycle),
+        renewal_cycle: rule.renewal_cycle,
+        status: "pending",
+        risk_score: 100,
+        priority: rule.priority,
+        penalty_rm_min: rule.penalty_rm_min,
+        penalty_rm_max: rule.penalty_rm_max,
+        notes: null,
+      }));
+
+      const { data: insertedItems, error: itemsError } = await supabase.from("compliance_items").insert(rows).select("*");
+      if (itemsError) {
+        return NextResponse.json({ error: itemsError.message }, { status: 500 });
+      }
+      complianceItems = insertedItems ?? [];
+    }
+
+    const { data: existingGrants, error: existingGrantsError } = await supabase
       .from("grant_matches")
-      .insert(
-        grants.map((g) => ({
-          business_id: business.id,
-          grant_name: g.grant_name,
-          grant_body: g.grant_body,
-          value_rm: g.value_rm,
-          eligibility_pct: g.eligibility_pct,
-          apply_url: g.apply_url,
-        })),
-      )
-      .select("*");
+      .select("*")
+      .eq("business_id", business.id)
+      .order("eligibility_pct", { ascending: false });
 
-    if (grantsError) {
-      return NextResponse.json({ error: grantsError.message }, { status: 500 });
+    if (existingGrantsError) {
+      return NextResponse.json({ error: existingGrantsError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ business, compliance_items: complianceItems ?? [], grant_matches: grantRows ?? [], simulated: false });
+    let grantRows = existingGrants ?? [];
+    if (!grantRows.length) {
+      const grants = matchGrants({ ...profile, owner_bumiputera: false, is_tech_startup: false });
+      const { data: insertedGrants, error: grantsError } = await supabase
+        .from("grant_matches")
+        .insert(
+          grants.map((g) => ({
+            business_id: business.id,
+            grant_name: g.grant_name,
+            grant_body: g.grant_body,
+            value_rm: g.value_rm,
+            eligibility_pct: g.eligibility_pct,
+            apply_url: g.apply_url,
+          })),
+        )
+        .select("*");
+
+      if (grantsError) {
+        return NextResponse.json({ error: grantsError.message }, { status: 500 });
+      }
+      grantRows = insertedGrants ?? [];
+    }
+
+    return NextResponse.json({ business, compliance_items: complianceItems, grant_matches: grantRows, simulated: false });
   } catch (error) {
     console.error("/api/onboard failed", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
