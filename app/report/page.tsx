@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatRM, getRiskColour, getStatusFromRisk, type ComplianceItem, type ForecastItem, type RiskData } from "@/lib/risk";
+import { formatRM, getRiskColour, getStatusFromRisk, type ComplianceItem, type RiskData } from "@/lib/risk";
 
 type Grant = {
   grant_name: string;
@@ -23,60 +23,37 @@ type ReportResponse = RiskData & {
   generated_at: string;
 };
 
-const MOCK_RISK: RiskData = {
-  overall_score: 72,
-  risk_level: "HIGH",
-  penalty_exposure: 72000,
-  items_at_risk: 4,
-  next_deadline: null,
-  items: [],
-  forecast: [] as ForecastItem[],
-};
-
-const MOCK_REPORT: ReportResponse = {
-  business: {
-    id: "mock-business-1",
-    name: "Warung Mak Jah",
-    type: "fnb",
-    location: "Subang Jaya",
-  },
-  ...MOCK_RISK,
-  grants: [
-    {
-      grant_name: "SME Digitalisation Grant",
-      grant_body: "MDEC",
-      value_rm: 5000,
-      eligibility_pct: 92,
-    },
-  ],
-  generated_at: new Date().toISOString(),
-};
-
 function SkeletonCard(): JSX.Element {
   return <div className="h-24 animate-pulse rounded-lg bg-gray-200" />;
 }
 
 export default function ReportPage(): JSX.Element {
-  const [report, setReport] = useState<ReportResponse>(MOCK_REPORT);
+  const [report, setReport] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    const businessId = localStorage.getItem("compliance_copilot_business_id") ?? "mock-business-1";
+    const businessId = localStorage.getItem("compliance_copilot_business_id");
+    if (!businessId) {
+      setError("No business selected.");
+      setLoading(false);
+      return;
+    }
 
     fetch(`/api/report?businessId=${businessId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setReport((data as ReportResponse) ?? MOCK_REPORT);
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error ?? "Failed to load report");
+        setReport(data as ReportResponse);
       })
       .catch((err) => {
-        console.warn("Report fetch failed, using mock data:", err);
-        setReport(MOCK_REPORT);
+        setError(err instanceof Error ? err.message : "Failed to load report");
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const scoreColour = useMemo(() => getRiskColour(report.overall_score), [report.overall_score]);
+  const scoreColour = useMemo(() => getRiskColour(report?.overall_score ?? 0), [report?.overall_score]);
 
   const copyLink = async (): Promise<void> => {
     await navigator.clipboard.writeText(window.location.href);
@@ -84,18 +61,44 @@ export default function ReportPage(): JSX.Element {
     setTimeout(() => setToast(null), 2000);
   };
 
+  const downloadPdf = async (): Promise<void> => {
+    if (!report?.business?.id) return;
+    const res = await fetch("/api/report/generate-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ businessId: report.business.id }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: "Failed to generate PDF" }));
+      setError((data as { error?: string }).error ?? "Failed to generate PDF");
+      return;
+    }
+    const blob = await res.blob();
+    const name = res.headers.get("x-filename") ?? "Compliance_Report.pdf";
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <main className="mx-auto max-w-4xl space-y-4 px-4 py-6 md:px-8">
-      <style>{`@media print { .no-print { display: none; } }`}</style>
-
       {loading ? (
         <div className="space-y-3">
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
         </div>
+      ) : error || !report ? (
+        <Card className="border-neutral-800 bg-neutral-900">
+          <CardContent className="p-4 text-sm text-rose-300">{error ?? "Failed to load report."}</CardContent>
+        </Card>
       ) : (
-        <Card className="bg-neutral-900 border-neutral-800">
+        <Card className="border-neutral-800 bg-neutral-900">
           <CardHeader className="space-y-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
@@ -109,11 +112,13 @@ export default function ReportPage(): JSX.Element {
                 </p>
               </div>
 
-              <div className="no-print flex gap-2">
-                <Button variant="outline" onClick={() => window.print()} className="border-neutral-700 text-neutral-200 hover:bg-neutral-800">
-                  Download PDF
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={downloadPdf} className="border-neutral-700 text-neutral-200 hover:bg-neutral-800">
+                  Download PDF Report
                 </Button>
-                <Button onClick={copyLink} className="bg-blue-600 hover:bg-blue-700">Share Report</Button>
+                <Button onClick={copyLink} className="bg-blue-600 hover:bg-blue-700">
+                  Share Report
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -128,13 +133,6 @@ export default function ReportPage(): JSX.Element {
                 <p className={`text-lg font-semibold ${report.penalty_exposure > 0 ? "text-red-400" : "text-green-400"}`}>
                   {formatRM(report.penalty_exposure)}
                 </p>
-              </div>
-
-              <div className="mt-3 h-3 w-full rounded-full bg-neutral-800">
-                <div
-                  className={`h-3 rounded-full ${scoreColour.bg.replace("100", "500").replace("200", "600")}`}
-                  style={{ width: `${Math.min(100, Math.max(0, report.overall_score))}%` }}
-                />
               </div>
             </section>
 
@@ -180,8 +178,8 @@ export default function ReportPage(): JSX.Element {
 
             {report.forecast.length > 0 ? (
               <section>
-                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-700">90-Day Forecast</h2>
-                <ul className="list-inside list-disc space-y-1 text-sm text-slate-700">
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Upcoming Deadlines (Next 90 Days)</h2>
+                <ul className="list-inside list-disc space-y-1 text-sm text-neutral-300">
                   {report.forecast.map((f) => (
                     <li key={f.item_id}>In {f.days_until_flip} days - {f.item_name} will reach HIGH risk</li>
                   ))}
@@ -191,8 +189,8 @@ export default function ReportPage(): JSX.Element {
 
             {report.grants.length > 0 ? (
               <section>
-                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-700">Eligible Grants</h2>
-                <div className="space-y-1 text-sm">
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Eligible Grants</h2>
+                <div className="space-y-1 text-sm text-neutral-300">
                   {report.grants.map((grant) => (
                     <p key={`${grant.grant_name}-${grant.grant_body}`}>
                       {grant.grant_name} - {formatRM(grant.value_rm)} ({grant.grant_body})
@@ -202,7 +200,7 @@ export default function ReportPage(): JSX.Element {
               </section>
             ) : null}
 
-            <footer className="border-t pt-3 text-xs text-slate-500">
+            <footer className="border-t pt-3 text-xs text-neutral-500">
               <p>This report was generated by Compliance Copilot v2.</p>
               <p>For official compliance advice, consult a qualified advisor.</p>
               <p>{new Date(report.generated_at).toISOString()}</p>
@@ -211,11 +209,8 @@ export default function ReportPage(): JSX.Element {
         </Card>
       )}
 
-      {toast ? (
-        <div className="no-print fixed bottom-4 right-4 rounded-md bg-slate-900 px-3 py-2 text-sm text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
+      {toast ? <div className="fixed bottom-4 right-4 rounded-md bg-slate-900 px-3 py-2 text-sm text-white shadow-lg">{toast}</div> : null}
     </main>
   );
 }
+

@@ -1,15 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin, hasSupabaseEnv, isSimulationMode } from "@/lib/supabase";
-import { MOCK_ITEMS } from "@/lib/mock";
+import { getSupabaseAdmin, hasSupabaseEnv } from "@/lib/supabase";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const itemId = req.nextUrl.searchParams.get("id");
 
-    if (isSimulationMode || !hasSupabaseEnv) {
-      return NextResponse.json({ items: itemId ? MOCK_ITEMS.filter((i) => i.id === itemId) : MOCK_ITEMS });
+    if (!hasSupabaseEnv) {
+      return NextResponse.json({ error: "Supabase environment is missing" }, { status: 500 });
     }
 
     const businessId = req.nextUrl.searchParams.get("businessId");

@@ -19,21 +19,9 @@ type DbRiskItemRow = {
   penalty_rm_min: number | null;
   penalty_rm_max: number | null;
   notes: string | null;
+  document_uploaded?: boolean | null;
+  expiry_date?: string | null;
   documents?: Array<{ id: string; expiry_date: string | null; uploaded_at: string | null }> | null;
-};
-
-const MOCK_RISK: RiskApiPayload = {
-  overall_score: 72,
-  risk_level: "HIGH",
-  penalty_exposure: 72000,
-  items_at_risk: 4,
-  next_deadline: {
-    name: "Premises Business Licence",
-    days_away: 45,
-    deadline: new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10),
-  },
-  items: [],
-  forecast: [],
 };
 
 function toPriority(value: string | null): Priority {
@@ -64,8 +52,8 @@ function mapDbRows(items: DbRiskItemRow[]): ComplianceItem[] {
       penalty_rm_min: item.penalty_rm_min ?? 0,
       penalty_rm_max: item.penalty_rm_max ?? 0,
       notes: item.notes ?? undefined,
-      document_uploaded: docs.length > 0,
-      expiry_date: docs[0]?.expiry_date ?? null,
+      document_uploaded: Boolean(item.document_uploaded) || docs.length > 0,
+      expiry_date: docs[0]?.expiry_date ?? item.expiry_date ?? null,
     };
   });
 }
@@ -73,7 +61,9 @@ function mapDbRows(items: DbRiskItemRow[]): ComplianceItem[] {
 export async function GET(req: NextRequest) {
   try {
     const SIM = process.env.SIMULATION_MODE === "true";
-    if (SIM) return NextResponse.json(MOCK_RISK);
+    if (SIM) {
+      return NextResponse.json({ error: "Simulation mode enabled. Set SIMULATION_MODE=false for real dashboard data." }, { status: 503 });
+    }
 
     const { searchParams } = new URL(req.url);
     const businessId = searchParams.get("businessId");
@@ -83,7 +73,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json(MOCK_RISK);
+      return NextResponse.json({ error: "Supabase environment variables are missing." }, { status: 500 });
     }
 
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -104,7 +94,7 @@ export async function GET(req: NextRequest) {
       .order("priority", { ascending: true });
 
     if (error) throw error;
-    if (!items || items.length === 0) return NextResponse.json(MOCK_RISK);
+    if (!items || items.length === 0) return NextResponse.json(buildRiskData([]));
 
     const mappedItems = mapDbRows(items as DbRiskItemRow[]);
 
@@ -133,6 +123,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(riskData);
   } catch (error) {
     console.error("Risk API error:", error);
-    return NextResponse.json(MOCK_RISK);
+    return NextResponse.json({ error: "Unable to fetch risk data." }, { status: 500 });
   }
 }

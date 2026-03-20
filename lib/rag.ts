@@ -113,7 +113,12 @@ export function buildRagPrompt(
   chunks: RagChunk[],
   businessContext?: string,
 ): RagPrompt {
-  const context = chunks
+  const compactChunks = chunks.slice(0, 3).map((chunk) => ({
+    ...chunk,
+    content: chunk.content.replace(/\s+/g, " ").slice(0, 700),
+  }));
+
+  const context = compactChunks
     .map(
       (chunk, idx) =>
         `${idx + 1}. [${chunk.source.toUpperCase()} - ${chunk.doc_title}, ${chunk.page_ref}]

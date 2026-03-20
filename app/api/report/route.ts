@@ -36,31 +36,6 @@ type DbReportItemRow = {
   documents?: Array<{ expiry_date: string | null; uploaded_at: string | null }> | null;
 };
 
-const MOCK_REPORT: ReportPayload = {
-  business: {
-    id: "mock-business-1",
-    name: "Warung Mak Jah",
-    type: "fnb",
-    location: "Subang Jaya",
-  },
-  overall_score: 72,
-  risk_level: "HIGH",
-  penalty_exposure: 72000,
-  items_at_risk: 4,
-  next_deadline: null,
-  items: [],
-  forecast: [],
-  grants: [
-    {
-      grant_name: "SME Digitalisation Grant",
-      grant_body: "MDEC",
-      value_rm: 5000,
-      eligibility_pct: 92,
-    },
-  ],
-  generated_at: new Date().toISOString(),
-};
-
 function toPriority(value: string | null): Priority {
   if (value === "CRITICAL" || value === "HIGH" || value === "MEDIUM" || value === "GRANT") return value;
   return "HIGH";
@@ -97,9 +72,6 @@ function mapDbItems(items: DbReportItemRow[]): ComplianceItem[] {
 
 export async function GET(req: NextRequest) {
   try {
-    const SIM = process.env.SIMULATION_MODE === "true";
-    if (SIM) return NextResponse.json({ ...MOCK_REPORT, generated_at: new Date().toISOString() });
-
     const { searchParams } = new URL(req.url);
     const businessId = searchParams.get("businessId");
 
@@ -108,7 +80,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({ ...MOCK_REPORT, generated_at: new Date().toISOString() });
+      return NextResponse.json({ error: "Supabase environment is missing" }, { status: 500 });
     }
 
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -120,7 +92,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     if (businessRes.error || !businessRes.data) {
-      return NextResponse.json({ ...MOCK_REPORT, generated_at: new Date().toISOString() });
+      return NextResponse.json({ error: businessRes.error?.message ?? "Business not found" }, { status: 404 });
     }
 
     const mappedItems = mapDbItems((itemsRes.data ?? []) as DbReportItemRow[]);
@@ -134,6 +106,6 @@ export async function GET(req: NextRequest) {
     } satisfies ReportPayload);
   } catch (error) {
     console.error("Report API error:", error);
-    return NextResponse.json({ ...MOCK_REPORT, generated_at: new Date().toISOString() });
+    return NextResponse.json({ error: "Failed to load report data" }, { status: 500 });
   }
 }
