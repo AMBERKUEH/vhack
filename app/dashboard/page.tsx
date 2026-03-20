@@ -415,13 +415,26 @@ export default function DashboardPage(): JSX.Element {
         </>
       )}
 
+      {/* Floating Chat Button */}
+      <Link 
+        href="/chat" 
+        className="fixed bottom-6 right-6 z-50 flex h-20 w-20 items-center justify-center rounded-full bg-neutral-800/80 backdrop-blur-md text-neutral-300 border border-neutral-700 shadow-lg transition-all duration-500 ease-out hover:scale-110 hover:bg-gradient-to-b hover:from-blue-500/30 hover:via-blue-600/20 hover:to-blue-700/10 hover:border-blue-400/50 hover:text-white hover:shadow-[0_0_25px_rgba(59,130,246,0.5),0_0_50px_rgba(59,130,246,0.3)]"
+        aria-label="Ask AI"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 8V4H8"/>
+          <rect width="16" height="12" x="4" y="8" rx="2"/>
+          <path d="M2 14h2"/>
+          <path d="M20 14h2"/>
+          <path d="M15 13v2"/>
+          <path d="M9 13v2"/>
+        </svg>
+      </Link>
+
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-900/95 p-3 backdrop-blur md:static md:border-none md:bg-transparent md:p-0">
-        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="mx-auto grid max-w-4xl grid-cols-3 gap-2 md:grid-cols-3">
           <LiquidGlassButton variant="primary" className="w-full">
             <Link href="/upload" className="flex items-center justify-center w-full">Upload Document</Link>
-          </LiquidGlassButton>
-          <LiquidGlassButton variant="outline" className="w-full">
-            <Link href="/chat" className="flex items-center justify-center w-full">Ask AI</Link>
           </LiquidGlassButton>
           <LiquidGlassButton variant="outline" className="w-full">
             <Link href="/alerts" className="flex items-center justify-center w-full">Set Alerts</Link>

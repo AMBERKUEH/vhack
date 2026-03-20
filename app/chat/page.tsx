@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { PromptSuggestion } from "@/components/ui/prompt-suggestion";
+import { ArrowLeft } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -115,7 +117,16 @@ export default function ChatPage(): JSX.Element {
       <Card className="bg-neutral-900 border-neutral-800">
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-white">AI Compliance Assistant</CardTitle>
+            <CardTitle className="text-white flex items-center gap-3">
+              <Link 
+                href="/dashboard" 
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white transition-colors"
+                aria-label="Back to Dashboard"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+              AI Compliance Assistant
+            </CardTitle>
             <Tabs value={language} onValueChange={(v) => setLanguage(v as "bm" | "en")}>
               <TabsList className="bg-neutral-800">
                 <TabsTrigger value="bm" className="data-[state=active]:bg-neutral-700">BM</TabsTrigger>
