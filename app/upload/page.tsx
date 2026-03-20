@@ -48,6 +48,7 @@ type BusinessProfile = {
   location: string;
   type: string;
 };
+type ComplianceChoice = { id: string; name: string; authority: string | null };
 
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -99,6 +100,8 @@ export default function UploadPage(): JSX.Element {
   const [confirmErrors, setConfirmErrors] = useState(false);
   const [downloading, setDownloading] = useState<"ssm" | "lhdn" | null>(null);
   const [displayScore, setDisplayScore] = useState<{ from: number; to: number } | null>(null);
+  const [choices, setChoices] = useState<ComplianceChoice[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState("");
 
   const businessProfile = useMemo<BusinessProfile | null>(() => {
     if (typeof window === "undefined") return null;
@@ -109,6 +112,20 @@ export default function UploadPage(): JSX.Element {
     if (!result) return;
     setDisplayScore({ from: result.old_score, to: result.new_score });
   }, [result]);
+
+  useEffect(() => {
+    if (!businessProfile?.id) return;
+    fetch(`/api/compliance?businessId=${businessProfile.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const rows = (data as { items?: ComplianceChoice[] }).items ?? [];
+        setChoices(rows);
+        if (rows.length) setSelectedItemId(rows[0].id);
+      })
+      .catch(() => {
+        setChoices([]);
+      });
+  }, [businessProfile?.id]);
 
   const onSelectFile = (selected: File | null): void => {
     setFile(selected);
@@ -136,6 +153,9 @@ export default function UploadPage(): JSX.Element {
       const form = new FormData();
       form.append("file", file);
       form.append("business_id", businessProfile.id);
+      if (selectedItemId) {
+        form.append("compliance_item_id", selectedItemId);
+      }
 
       const response = await fetch("/api/upload", { method: "POST", body: form });
       const data = (await response.json()) as UploadResponse | { error: string };
@@ -186,10 +206,11 @@ export default function UploadPage(): JSX.Element {
     if (!businessProfile || !editable || !canGenerate) return;
     setDownloading("ssm");
     try {
-      const res = await fetch("/api/forms/ssm-borang-a/generate", {
+      const res = await fetch("/api/forms/generate-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          form_type: "ssm-borang-a",
           business_id: businessProfile.id,
           extracted_data: {
             company_name: editable.company_name,
@@ -216,18 +237,18 @@ export default function UploadPage(): JSX.Element {
     if (!businessProfile || !editable || !canGenerate) return;
     setDownloading("lhdn");
     try {
-      const res = await fetch("/api/forms/lhdn-einvoice/generate", {
+      const res = await fetch("/api/forms/generate-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ business_id: businessProfile.id, extracted_data: editable }),
+        body: JSON.stringify({ form_type: "lhdn-cp204", business_id: businessProfile.id, extracted_data: editable }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Failed to generate LHDN JSON" }));
         throw new Error((err as { error?: string }).error ?? "Failed to generate LHDN JSON");
       }
       const blob = await res.blob();
-      const invoiceNo = editable.invoice_no?.trim() || `INV-${Date.now()}`;
-      downloadBlob(blob, `LHDN_eInvoice_${invoiceNo}.json`);
+      const invoiceNo = editable.invoice_no?.trim() || `CP204-${Date.now()}`;
+      downloadBlob(blob, `LHDN_CP204_${invoiceNo}.pdf`);
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Failed to generate LHDN JSON");
     } finally {
@@ -266,6 +287,22 @@ export default function UploadPage(): JSX.Element {
           </div>
 
           {file ? <p className="text-sm text-neutral-300">Selected file: {file.name}</p> : null}
+          {choices.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-xs text-neutral-400">Link this document to compliance item</p>
+              <select
+                value={selectedItemId}
+                onChange={(e) => setSelectedItemId(e.target.value)}
+                className="h-10 w-full rounded-md border border-neutral-700 bg-neutral-900 px-3 text-sm text-neutral-100"
+              >
+                {choices.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.authority ?? "Unknown"})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <Button className="bg-blue-600 hover:bg-blue-700" disabled={!file || loading} onClick={runUpload}>
             {loading ? (
               <span className="inline-flex items-center gap-2">
@@ -467,14 +504,9 @@ export default function UploadPage(): JSX.Element {
               </Button>
             ) : null}
             {showLHDN ? (
-              <>
-                <Button disabled={!canGenerate || downloading !== null} onClick={handleGenerateLhdn} className="bg-violet-600 hover:bg-violet-700">
-                  {downloading === "lhdn" ? "Generating..." : "Download Pre-filled LHDN e-Invoice JSON"}
-                </Button>
-                <Button disabled={!canGenerate || downloading !== null} onClick={handleGenerateLhdn} variant="outline" className="border-neutral-700 text-neutral-200">
-                  {downloading === "lhdn" ? "Generating..." : "Download MyInvois-ready JSON"}
-                </Button>
-              </>
+              <Button disabled={!canGenerate || downloading !== null} onClick={handleGenerateLhdn} className="bg-violet-600 hover:bg-violet-700">
+                {downloading === "lhdn" ? "Generating..." : "Download Pre-filled LHDN CP204"}
+              </Button>
             ) : null}
             <Button asChild variant="outline" className="border-neutral-700 text-neutral-200">
               <Link href="/dashboard">Back to Dashboard</Link>
@@ -485,4 +517,3 @@ export default function UploadPage(): JSX.Element {
     </main>
   );
 }
-

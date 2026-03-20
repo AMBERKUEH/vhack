@@ -11,6 +11,8 @@ ALTER TABLE risk_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE grant_matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE form_submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rag_chunks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE email_alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alert_logs ENABLE ROW LEVEL SECURITY;
 
 -- -------------------------------------------------------------------
 -- BUSINESSES
@@ -381,6 +383,97 @@ CREATE POLICY form_submissions_delete_own
   );
 
 -- -------------------------------------------------------------------
+-- EMAIL ALERTS
+-- -------------------------------------------------------------------
+DROP POLICY IF EXISTS email_alerts_select_own ON email_alerts;
+CREATE POLICY email_alerts_select_own
+  ON email_alerts
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM businesses b
+      WHERE b.id = email_alerts.business_id
+        AND b.owner_email = (auth.jwt() ->> 'email')
+    )
+  );
+
+DROP POLICY IF EXISTS email_alerts_insert_own ON email_alerts;
+CREATE POLICY email_alerts_insert_own
+  ON email_alerts
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM businesses b
+      WHERE b.id = email_alerts.business_id
+        AND b.owner_email = (auth.jwt() ->> 'email')
+    )
+  );
+
+DROP POLICY IF EXISTS email_alerts_update_own ON email_alerts;
+CREATE POLICY email_alerts_update_own
+  ON email_alerts
+  FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM businesses b
+      WHERE b.id = email_alerts.business_id
+        AND b.owner_email = (auth.jwt() ->> 'email')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM businesses b
+      WHERE b.id = email_alerts.business_id
+        AND b.owner_email = (auth.jwt() ->> 'email')
+    )
+  );
+
+DROP POLICY IF EXISTS email_alerts_delete_own ON email_alerts;
+CREATE POLICY email_alerts_delete_own
+  ON email_alerts
+  FOR DELETE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM businesses b
+      WHERE b.id = email_alerts.business_id
+        AND b.owner_email = (auth.jwt() ->> 'email')
+    )
+  );
+
+-- -------------------------------------------------------------------
+-- ALERT LOGS
+-- -------------------------------------------------------------------
+DROP POLICY IF EXISTS alert_logs_select_own ON alert_logs;
+CREATE POLICY alert_logs_select_own
+  ON alert_logs
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM businesses b
+      WHERE b.id = alert_logs.business_id
+        AND b.owner_email = (auth.jwt() ->> 'email')
+    )
+  );
+
+DROP POLICY IF EXISTS alert_logs_insert_own ON alert_logs;
+CREATE POLICY alert_logs_insert_own
+  ON alert_logs
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM businesses b
+      WHERE b.id = alert_logs.business_id
+        AND b.owner_email = (auth.jwt() ->> 'email')
+    )
+  );
+
+-- -------------------------------------------------------------------
 -- RAG CHUNKS
 -- Keep read-only for authenticated users.
 -- Writes happen from server-side scripts with service role key.
@@ -391,4 +484,3 @@ CREATE POLICY rag_chunks_read_authenticated
   FOR SELECT
   TO authenticated
   USING (true);
-

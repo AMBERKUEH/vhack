@@ -10,6 +10,7 @@ interface ExtractedLike {
   document_type?: string | null;
   company_name?: string | null;
   reg_no?: string | null;
+  issue_date?: string | null;
   expiry_date?: string | null;
 }
 
@@ -48,6 +49,21 @@ export async function detectAnomalies(
     }
   }
 
+  if (extracted.issue_date && extracted.expiry_date) {
+    const issue = new Date(extracted.issue_date);
+    const expiry = new Date(extracted.expiry_date);
+    if (!Number.isNaN(issue.getTime()) && !Number.isNaN(expiry.getTime())) {
+      const days = Math.floor((expiry.getTime() - issue.getTime()) / 86400000);
+      if (days > 0 && days < 90) {
+        flags.push({
+          code: "SHORT_EXPIRY",
+          message: "Document validity period looks unusually short",
+          severity: "warning",
+        });
+      }
+    }
+  }
+
   if ((extracted.document_type ?? "Unknown") === "Unknown") {
     flags.push({
       code: "UNRECOGNISED_DOC",
@@ -75,4 +91,3 @@ export async function detectAnomalies(
 
   return flags;
 }
-

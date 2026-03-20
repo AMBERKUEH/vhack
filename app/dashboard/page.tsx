@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
@@ -146,12 +148,20 @@ function ComplianceItemCard({ item }: { item: ComplianceItem }): JSX.Element {
 }
 
 export default function DashboardPage(): JSX.Element {
+  const router = useRouter();
   const [riskData, setRiskData] = useState<RiskData | null>(null);
   const [grants, setGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const resolveBusinessId = (): string | null => {
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !anon) return null;
+    return createClient(url, anon);
+  }, []);
+
+  const resolveBusinessIdFromLocal = (): string | null => {
     const explicit = localStorage.getItem("compliance_copilot_business_id");
     if (explicit) return explicit;
     const raw = localStorage.getItem("cc_business");
@@ -161,6 +171,41 @@ export default function DashboardPage(): JSX.Element {
     } catch {
       return null;
     }
+  };
+
+  const resolveBusinessId = async (): Promise<string | null> => {
+    if (!supabase) return resolveBusinessIdFromLocal();
+    const { data } = await supabase.auth.getUser();
+    const user = data.user;
+    if (!user?.email) return resolveBusinessIdFromLocal();
+
+    const byUserId = await supabase
+      .from("businesses")
+      .select("id, name")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let business = byUserId.data;
+    if (!business) {
+      const byEmail = await supabase
+        .from("businesses")
+        .select("id, name")
+        .eq("owner_email", user.email)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      business = byEmail.data;
+    }
+
+    if (business?.id) {
+      localStorage.setItem("compliance_copilot_business_id", business.id);
+      localStorage.setItem("compliance_copilot_business_name", business.name ?? "-");
+      return business.id;
+    }
+
+    return resolveBusinessIdFromLocal();
   };
 
   const fetchDashboardData = async (businessId: string): Promise<void> => {
@@ -183,22 +228,17 @@ export default function DashboardPage(): JSX.Element {
 
   useEffect(() => {
     let mounted = true;
-    const businessId = resolveBusinessId();
-
-    if (!businessId) {
-      setError("No business found. Please complete onboarding first.");
-      setLoading(false);
-      return;
-    }
-
-    fetchDashboardData(businessId)
-      .then(() => {
-        if (!mounted) return;
+    resolveBusinessId()
+      .then((businessId) => {
+        if (!businessId) {
+          throw new Error("No business found. Please complete onboarding first.");
+        }
+        return fetchDashboardData(businessId);
       })
       .catch((err) => {
         console.error("Dashboard fetch failed:", err);
         if (!mounted) return;
-        setError("Unable to load real dashboard data. Please check Supabase and API configuration.");
+        setError(err instanceof Error ? err.message : "Unable to load dashboard data.");
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -211,11 +251,14 @@ export default function DashboardPage(): JSX.Element {
 
   useEffect(() => {
     const onRiskUpdated = (): void => {
-      const businessId = resolveBusinessId();
-      if (!businessId) return;
-      fetchDashboardData(businessId).catch((err) => {
-        console.error("Realtime refresh failed:", err);
-      });
+      resolveBusinessId()
+        .then((businessId) => {
+          if (!businessId) return;
+          return fetchDashboardData(businessId);
+        })
+        .catch((err) => {
+          console.error("Realtime refresh failed:", err);
+        });
     };
 
     window.addEventListener("compliance-risk-updated", onRiskUpdated);
@@ -232,11 +275,27 @@ export default function DashboardPage(): JSX.Element {
     return localStorage.getItem("compliance_copilot_business_name") ?? "-";
   }, []);
 
+  const handleLogout = async (): Promise<void> => {
+    if (!supabase) {
+      document.cookie = "cc_auth=; Path=/; Max-Age=0; SameSite=Lax";
+      router.push("/auth");
+      return;
+    }
+    await supabase.auth.signOut();
+    document.cookie = "cc_auth=; Path=/; Max-Age=0; SameSite=Lax";
+    router.push("/auth");
+  };
+
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-4 pb-28 pt-6 md:px-8 md:pb-10">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold text-white">Compliance Dashboard</h1>
-        <p className="text-sm text-neutral-400">{businessName}</p>
+      <header className="flex items-center justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold text-white">Compliance Dashboard</h1>
+          <p className="text-sm text-neutral-400">{businessName}</p>
+        </div>
+        <LiquidGlassButton variant="outline" onClick={handleLogout}>
+          Logout
+        </LiquidGlassButton>
       </header>
 
       {loading ? (

@@ -158,6 +158,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     const formData = await req.formData();
     const file = formData.get("file");
     const businessId = String(formData.get("business_id") ?? formData.get("businessId") ?? "");
+    const selectedComplianceItemId = String(formData.get("compliance_item_id") ?? "");
 
     if (!(file instanceof File) || !businessId) {
       return NextResponse.json({ error: "file and business_id are required" }, { status: 400 });
@@ -190,13 +191,29 @@ export async function POST(req: Request): Promise<NextResponse> {
 
     const anomalyFlags: AnomalyFlag[] = await detectAnomalies(extracted, business.name, supabase, businessId);
 
-    const { data: matchedItem, error: matchError } = await supabase
-      .from("compliance_items")
-      .select("*")
-      .eq("business_id", businessId)
-      .eq("authority", extracted.authority)
-      .limit(1)
-      .maybeSingle();
+    let matchedItem: { id: string; deadline: string | null } | null = null;
+    let matchError: { message: string } | null = null;
+
+    if (selectedComplianceItemId) {
+      const byId = await supabase
+        .from("compliance_items")
+        .select("id, deadline")
+        .eq("business_id", businessId)
+        .eq("id", selectedComplianceItemId)
+        .maybeSingle();
+      matchedItem = (byId.data as { id: string; deadline: string | null } | null) ?? null;
+      matchError = byId.error ? { message: byId.error.message } : null;
+    } else {
+      const byAuthority = await supabase
+        .from("compliance_items")
+        .select("id, deadline")
+        .eq("business_id", businessId)
+        .eq("authority", extracted.authority)
+        .limit(1)
+        .maybeSingle();
+      matchedItem = (byAuthority.data as { id: string; deadline: string | null } | null) ?? null;
+      matchError = byAuthority.error ? { message: byAuthority.error.message } : null;
+    }
 
     if (matchError) {
       return NextResponse.json({ error: matchError.message }, { status: 500 });
@@ -212,7 +229,7 @@ export async function POST(req: Request): Promise<NextResponse> {
           document_uploaded: true,
           status: "uploaded",
           expiry_date: expiry,
-          deadline: expiry ?? matchedItem.deadline,
+          deadline: expiry ?? matchedItem?.deadline ?? null,
         })
         .eq("id", linkedItemId);
 
@@ -222,7 +239,7 @@ export async function POST(req: Request): Promise<NextResponse> {
           .update({
             document_uploaded: true,
             status: "uploaded",
-            deadline: expiry ?? matchedItem.deadline,
+            deadline: expiry ?? matchedItem?.deadline ?? null,
           })
           .eq("id", linkedItemId);
         if (fallbackUpdate.error) {
@@ -264,6 +281,16 @@ export async function POST(req: Request): Promise<NextResponse> {
       ),
     );
 
+    if (newScore !== oldScore) {
+      await supabase.from("risk_events").insert({
+        business_id: businessId,
+        event_type: "document_upload",
+        old_score: oldScore,
+        new_score: newScore,
+        description: `Risk changed after document upload (${file.name})`,
+      });
+    }
+
     return NextResponse.json({
       success: true,
       document_id: insertedDoc.id,
@@ -282,4 +309,3 @@ export async function POST(req: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Upload processing failed" }, { status: 500 });
   }
 }
-

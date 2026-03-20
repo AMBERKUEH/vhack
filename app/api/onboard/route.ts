@@ -64,7 +64,7 @@ async function extractBusinessProfile(prompt: string): Promise<Partial<BusinessP
 
 export async function POST(req: Request): Promise<NextResponse> {
   try {
-    const body = (await req.json()) as { prompt: string; email: string };
+    const body = (await req.json()) as { prompt: string; email: string; userId?: string };
     if (!body?.prompt || !body?.email) {
       return NextResponse.json({ error: "prompt and email are required" }, { status: 400 });
     }
@@ -127,6 +127,7 @@ export async function POST(req: Request): Promise<NextResponse> {
           channels: profile.channels ?? [profile.sells_online ? "online" : "offline"],
           product_type: profile.product_type,
           raw_prompt: body.prompt,
+          user_id: body.userId ?? null,
           language_pref: "en",
         })
         .eq("id", business.id)
@@ -151,6 +152,7 @@ export async function POST(req: Request): Promise<NextResponse> {
           product_type: profile.product_type,
           raw_prompt: body.prompt,
           owner_email: body.email,
+          user_id: body.userId ?? null,
           language_pref: "en",
         })
         .select("*")

@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS businesses (
   product_type  TEXT,
   raw_prompt    TEXT,
   owner_email   TEXT UNIQUE,
+  user_id       UUID,
   language_pref TEXT DEFAULT 'en',
   created_at    TIMESTAMPTZ DEFAULT now()
 );
