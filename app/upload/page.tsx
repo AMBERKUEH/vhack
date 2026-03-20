@@ -26,6 +26,9 @@ type ExtractedData = {
   msic_code: string | null;
   total_amount: number | null;
   tax_amount: number | null;
+  address?: string | null;
+  phone?: string | null;
+  postcode?: string | null;
 };
 
 type UploadResponse = {
@@ -47,6 +50,8 @@ type BusinessProfile = {
   name: string;
   location: string;
   type: string;
+  council?: string;
+  state?: string;
 };
 type ComplianceChoice = { id: string; name: string; authority: string | null };
 
@@ -83,6 +88,8 @@ function parseBusinessProfile(): BusinessProfile | null {
       name: parsed.name ?? "",
       location: parsed.location ?? "",
       type: parsed.type ?? "",
+      council: parsed.council ?? "",
+      state: parsed.state ?? "",
     };
   } catch {
     return null;
@@ -210,14 +217,29 @@ export default function UploadPage(): JSX.Element {
           form_type: "ssm",
           business_id: businessProfile.id,
           fields: {
-            nama_perniagaan: editable.company_name || "",
-            alamat: "",
-            no_mykad: editable.reg_no || "",
-            no_telefon: "",
+            nama_perniagaan: editable.company_name || businessProfile.name || "",
+            tarikh_dd: "",
+            tarikh_mm: "",
+            tarikh_yyyy: "",
+            alamat: editable.address || businessProfile.location || "",
+            alamat_line2: "",
+            bandar: businessProfile.council || businessProfile.location || "",
+            poskod: editable.postcode || "",
+            negeri: businessProfile.state || "",
+            no_telefon: editable.phone || "",
+            emel: "",
             jenis_perniagaan: businessProfile.type || "",
-            company_name: editable.company_name || "",
+            nama_pemilik: editable.company_name || "",
+            no_mykad: editable.reg_no || "",
+            tarikh_lahir: "",
+            alamat_kediaman: businessProfile.location || "",
+            bandar_kediaman: businessProfile.council || "",
+            poskod_kediaman: editable.postcode || "",
+            negeri_kediaman: businessProfile.state || "",
+            no_telefon_pemilik: editable.phone || "",
+            company_name: editable.company_name || businessProfile.name || "",
             tax_ref_no: editable.reg_no || "",
-            estimated_tax_payable: String(editable.amount ?? ""),
+            estimated_tax_payable: String(editable.amount || ""),
           },
         }),
       });
@@ -246,14 +268,29 @@ export default function UploadPage(): JSX.Element {
           form_type: "lhdn-cp204",
           business_id: businessProfile.id,
           fields: {
-            nama_perniagaan: editable.company_name || "",
-            alamat: "",
-            no_mykad: editable.reg_no || "",
-            no_telefon: "",
+            nama_perniagaan: editable.company_name || businessProfile.name || "",
+            tarikh_dd: "",
+            tarikh_mm: "",
+            tarikh_yyyy: "",
+            alamat: editable.address || businessProfile.location || "",
+            alamat_line2: "",
+            bandar: businessProfile.council || businessProfile.location || "",
+            poskod: editable.postcode || "",
+            negeri: businessProfile.state || "",
+            no_telefon: editable.phone || "",
+            emel: "",
             jenis_perniagaan: businessProfile.type || "",
-            company_name: editable.company_name || "",
+            nama_pemilik: editable.company_name || "",
+            no_mykad: editable.reg_no || "",
+            tarikh_lahir: "",
+            alamat_kediaman: businessProfile.location || "",
+            bandar_kediaman: businessProfile.council || "",
+            poskod_kediaman: editable.postcode || "",
+            negeri_kediaman: businessProfile.state || "",
+            no_telefon_pemilik: editable.phone || "",
+            company_name: editable.company_name || businessProfile.name || "",
             tax_ref_no: editable.reg_no || "",
-            estimated_tax_payable: String(editable.amount ?? ""),
+            estimated_tax_payable: String(editable.amount || ""),
           },
         }),
       });
@@ -525,6 +562,9 @@ export default function UploadPage(): JSX.Element {
             </div>
             <p className="text-xs text-neutral-400">
               Pre-filled drafts only. Always verify before submitting to the government portal.
+            </p>
+            <p className="text-xs text-neutral-400">
+              ℹ️ For SSM Borang A: some fields like MyKad number, date of birth, and signature still need to be filled in manually before submission. Fields we could fill are pre-filled from your uploaded document.
             </p>
             <Button asChild variant="outline" className="border-neutral-700 text-neutral-200">
               <Link href="/dashboard">Back to Dashboard</Link>

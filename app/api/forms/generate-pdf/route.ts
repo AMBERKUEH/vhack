@@ -1,6 +1,8 @@
 ﻿import { NextResponse } from "next/server";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, type PDFPage, type PDFFont } from "pdf-lib";
 import { getSupabaseAdmin, hasSupabaseEnv } from "@/lib/supabase";
 
 type FormType = "ssm" | "lhdn-cp204";
@@ -11,67 +13,92 @@ type GenerateBody = {
   fields: Record<string, string>;
 };
 
-function todayYmd(): string {
-  return new Date().toISOString().slice(0, 10);
+type BusinessRow = {
+  id: string;
+  name: string | null;
+  location: string | null;
+  state: string | null;
+  council: string | null;
+  employees: number | null;
+  type: string | null;
+  owner_email: string | null;
+  created_at: string | null;
+};
+
+function todayParts(): { yyyy: string; mm: string; dd: string; ymd: string; display: string } {
+  const d = new Date();
+  const yyyy = String(d.getFullYear());
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return {
+    yyyy,
+    mm,
+    dd,
+    ymd: `${yyyy}-${mm}-${dd}`,
+    display: d.toLocaleDateString("en-MY"),
+  };
+}
+
+function createdDateParts(createdAt: string | null): { dd: string; mm: string; yyyy: string } {
+  const fallback = todayParts();
+  if (!createdAt) return { dd: fallback.dd, mm: fallback.mm, yyyy: fallback.yyyy };
+  const parsed = new Date(createdAt);
+  if (Number.isNaN(parsed.getTime())) return { dd: fallback.dd, mm: fallback.mm, yyyy: fallback.yyyy };
+  return {
+    dd: String(parsed.getDate()).padStart(2, "0"),
+    mm: String(parsed.getMonth() + 1).padStart(2, "0"),
+    yyyy: String(parsed.getFullYear()),
+  };
+}
+
+function toUpper(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+function drawUpper(page: PDFPage, font: PDFFont, bold: PDFFont, text: string, x: number, y: number, size = 9, useBold = false): void {
+  const value = toUpper(text);
+  if (!value) return;
+  page.drawText(value, {
+    x,
+    y,
+    size,
+    font: useBold ? bold : font,
+    color: rgb(0, 0, 0),
+  });
+}
+
+function parseMyKad(raw: string): { p1: string; p2: string; p3: string } {
+  const cleaned = raw.replace(/-/g, "").trim();
+  return {
+    p1: cleaned.slice(0, 6),
+    p2: cleaned.slice(6, 8),
+    p3: cleaned.slice(8, 12),
+  };
 }
 
 function parseAmount(value: string | undefined): number | null {
   if (!value || !value.trim()) return null;
-  const parsed = Number(value.replace(/,/g, ""));
-  return Number.isFinite(parsed) ? parsed : null;
+  const n = Number(value.replace(/,/g, ""));
+  return Number.isFinite(n) ? n : null;
 }
 
-function drawField(
-  page: import("pdf-lib").PDFPage,
-  font: import("pdf-lib").PDFFont,
-  bold: import("pdf-lib").PDFFont,
-  label: string,
-  value: string,
-  y: number,
-  autoFilled: boolean,
-): void {
-  const labelColor = rgb(0.45, 0.45, 0.45);
-  const autoBg = rgb(0.92, 0.98, 0.93);
-  const autoBorder = rgb(0.13, 0.68, 0.33);
-  const emptyBg = rgb(0.96, 0.96, 0.96);
-  const emptyBorder = rgb(0.75, 0.75, 0.75);
-  const textColor = rgb(0.08, 0.08, 0.08);
-
-  page.drawText(label, { x: 50, y: y + 22, size: 8, font, color: labelColor });
-  page.drawRectangle({
-    x: 50,
-    y,
-    width: 495,
-    height: 20,
-    color: autoFilled ? autoBg : emptyBg,
-    borderColor: autoFilled ? autoBorder : emptyBorder,
-    borderWidth: 1,
-  });
-
-  const display = value.trim() ? value : "(not provided)";
-  page.drawText(display, { x: 56, y: y + 6, size: 10, font: value.trim() ? font : bold, color: textColor });
-  page.drawText(autoFilled ? "auto-filled" : "manual", {
-    x: 480,
-    y: y + 6,
-    size: 8,
-    font,
-    color: autoFilled ? autoBorder : labelColor,
-  });
-}
-
-async function resolveUserEmail(req: Request): Promise<string | null> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return null;
+async function resolveUserEmail(req: Request, fallback: string): Promise<string> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnon) return fallback;
 
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) return null;
+  if (!token) return fallback;
 
-  const supabase = createClient(url, anon);
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user?.email) return null;
+  const browserSupabase = createClient(supabaseUrl, supabaseAnon);
+  const { data, error } = await browserSupabase.auth.getUser(token);
+  if (error || !data.user?.email) return fallback;
   return data.user.email;
+}
+
+function filenameSafe(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_-]+/g, "_");
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -81,11 +108,11 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const body = (await req.json()) as GenerateBody;
-    if (!body.business_id || !body.form_type || !body.fields) {
+    if (!body.form_type || !body.business_id || !body.fields) {
       return NextResponse.json({ error: "form_type, business_id, and fields are required" }, { status: 400 });
     }
     if (body.form_type !== "ssm" && body.form_type !== "lhdn-cp204") {
-      return NextResponse.json({ error: "form_type must be 'ssm' or 'lhdn-cp204'" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid form_type" }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
@@ -93,125 +120,219 @@ export async function POST(req: Request): Promise<Response> {
       .from("businesses")
       .select("id, name, location, state, council, employees, type, owner_email, created_at")
       .eq("id", body.business_id)
-      .single();
+      .single<BusinessRow>();
 
     if (businessError || !business) {
       return NextResponse.json({ error: businessError?.message ?? "Business not found" }, { status: 404 });
     }
 
-    const authEmail = await resolveUserEmail(req);
-    const userEmail = authEmail ?? business.owner_email ?? "";
+    const t = todayParts();
+    const start = createdDateParts(business.created_at);
+    const userEmail = await resolveUserEmail(req, business.owner_email ?? "");
 
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]);
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    let pdfBytes: Uint8Array;
+    let filename: string;
 
-    const BLACK = rgb(0.05, 0.05, 0.05);
-    const WHITE = rgb(1, 1, 1);
-    const ORANGE = rgb(0.9, 0.45, 0.1);
-    const GREEN = rgb(0.15, 0.7, 0.35);
+    if (body.form_type === "ssm") {
+      const formPath = join(process.cwd(), "public", "forms", "borang-a.pdf");
+      let templateBytes: Buffer;
+      try {
+        templateBytes = await readFile(formPath);
+      } catch {
+        return NextResponse.json({ error: "SSM form template not found. Please contact support." }, { status: 500 });
+      }
 
-    const date = todayYmd();
+      const pdfDoc = await PDFDocument.load(templateBytes);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const pages = pdfDoc.getPages();
+      if (pages.length < 2) {
+        return NextResponse.json({ error: "SSM form template is invalid. Please contact support." }, { status: 500 });
+      }
 
-    const title = body.form_type === "ssm" ? "SSM BORANG A" : "LHDN CP204";
-    const gov = body.form_type === "ssm" ? "SURUHANJAYA SYARIKAT MALAYSIA" : "LEMBAGA HASIL DALAM NEGERI";
+      const page1 = pages[0];
+      const page2 = pages[1];
+      const f = body.fields;
 
-    page.drawRectangle({ x: 0, y: 772, width: 595, height: 70, color: BLACK });
-    page.drawText(gov, { x: 50, y: 812, size: 10, font, color: WHITE });
-    page.drawText(title, { x: 50, y: 790, size: 20, font: bold, color: WHITE });
+      drawUpper(page1, font, bold, f.nama_perniagaan || business.name || "", 160, 561, 9, true);
+      drawUpper(page1, font, bold, f.tarikh_dd || start.dd, 175, 525, 9);
+      drawUpper(page1, font, bold, f.tarikh_mm || start.mm, 240, 525, 9);
+      drawUpper(page1, font, bold, f.tarikh_yyyy || start.yyyy, 293, 525, 9);
+      drawUpper(page1, font, bold, f.alamat || business.location || "", 160, 479, 9);
+      drawUpper(page1, font, bold, f.alamat_line2 || "", 160, 462, 9);
+      drawUpper(page1, font, bold, f.bandar || business.council || business.location || "", 160, 438, 9);
+      drawUpper(page1, font, bold, f.poskod || "", 160, 421, 9);
+      drawUpper(page1, font, bold, f.negeri || business.state || "", 340, 421, 9);
+      drawUpper(page1, font, bold, f.no_telefon || "", 160, 324, 9);
+      drawUpper(page1, font, bold, f.emel || userEmail, 450, 324, 9);
+      drawUpper(page1, font, bold, f.jenis_perniagaan || business.type || "", 72, 283, 9);
 
-    const fields = body.fields;
+      drawUpper(page2, font, bold, f.nama_pemilik || "", 160, 713, 9, true);
+      const mykad = parseMyKad(f.no_mykad || "");
+      drawUpper(page2, font, bold, mykad.p1, 160, 680, 9);
+      drawUpper(page2, font, bold, mykad.p2, 255, 680, 9);
+      drawUpper(page2, font, bold, mykad.p3, 305, 680, 9);
 
-    const year = new Date().getFullYear();
-    const estimatedTax = parseAmount(fields.estimated_tax_payable);
-    const installment = estimatedTax !== null ? (estimatedTax / 12).toFixed(2) : "";
+      const dob = (f.tarikh_lahir || "").trim();
+      if (dob) {
+        const [dobY = "", dobM = "", dobD = ""] = dob.split("-");
+        drawUpper(page2, font, bold, dobD, 148, 663, 9);
+        drawUpper(page2, font, bold, dobM, 196, 663, 9);
+        drawUpper(page2, font, bold, dobY, 242, 663, 9);
+      }
 
-    const ssmRows: Array<{ label: string; value: string; auto: boolean }> = [
-      { label: "NAMA PERNIAGAAN", value: fields.nama_perniagaan || business.name || "", auto: !fields.nama_perniagaan },
-      { label: "TARIKH MULA BERNIAGA", value: fields.tarikh_mula_berniaga || String(business.created_at || date).slice(0, 10), auto: !fields.tarikh_mula_berniaga },
-      { label: "ALAMAT", value: fields.alamat || business.location || "", auto: !fields.alamat },
-      { label: "BANDAR", value: fields.bandar || business.council || business.location || "", auto: !fields.bandar },
-      { label: "POSKOD", value: fields.poskod || "", auto: false },
-      { label: "NEGERI", value: fields.negeri || business.state || "", auto: !fields.negeri },
-      { label: "NO. TELEFON", value: fields.no_telefon || "", auto: false },
-      { label: "E-MEL", value: fields.emel || userEmail, auto: !fields.emel },
-      { label: "JENIS PERNIAGAAN", value: fields.jenis_perniagaan || business.type || "", auto: !fields.jenis_perniagaan },
-      { label: "NAMA PEMILIK", value: fields.nama_pemilik || "", auto: false },
-      { label: "NO. MYKAD/MYPR", value: fields.no_mykad || "", auto: false },
-      { label: "TARIKH PERMOHONAN", value: date, auto: true },
-    ];
+      drawUpper(page2, font, bold, f.alamat_kediaman || business.location || "", 160, 605, 9);
+      drawUpper(page2, font, bold, f.bandar_kediaman || business.council || "", 160, 552, 9);
+      drawUpper(page2, font, bold, f.poskod_kediaman || "", 160, 534, 9);
+      drawUpper(page2, font, bold, f.negeri_kediaman || business.state || "", 300, 534, 9);
+      drawUpper(page2, font, bold, f.no_telefon_pemilik || "", 160, 515, 9);
 
-    const lhdnRows: Array<{ label: string; value: string; auto: boolean }> = [
-      { label: "NAMA SYARIKAT", value: fields.company_name || business.name || "", auto: !fields.company_name },
-      { label: "NO. RUJUKAN CUKAI", value: fields.tax_ref_no || "", auto: false },
-      { label: "TARIKH MULA (PERIOD)", value: fields.accounting_period_start || `01/01/${year}`, auto: !fields.accounting_period_start },
-      { label: "TARIKH AKHIR (PERIOD)", value: fields.accounting_period_end || `31/12/${year}`, auto: !fields.accounting_period_end },
-      { label: "ANGGARAN CUKAI (RM)", value: fields.estimated_tax_payable || "", auto: false },
-      { label: "ANSURAN BULANAN (RM)", value: fields.installment_amount || installment, auto: !fields.installment_amount },
-    ];
+      drawUpper(page2, font, bold, t.dd, 175, 79, 9);
+      drawUpper(page2, font, bold, t.mm, 230, 79, 9);
+      drawUpper(page2, font, bold, t.yyyy, 280, 79, 9);
 
-    const rows = body.form_type === "ssm" ? ssmRows : lhdnRows;
+      page1.drawText(`Auto-filled by LULUS AI on ${t.display}`.toUpperCase(), {
+        x: 160,
+        y: 25,
+        size: 7,
+        font,
+        color: rgb(0.1, 0.5, 0.2),
+        opacity: 0.7,
+      });
 
-    let y = 730;
-    for (const row of rows) {
-      drawField(page, font, bold, row.label, row.value, y, row.auto);
-      y -= 44;
+      pdfBytes = await pdfDoc.save();
+      filename = `LULUSAI_SSM_BorangA_${filenameSafe(business.name ?? "draft")}_${t.yyyy}${t.mm}${t.dd}.pdf`;
+    } else {
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([595, 842]);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      const PAGE_WIDTH = 595;
+      const PAGE_HEIGHT = 842;
+      const MARGIN = 50;
+      const BLACK = rgb(0, 0, 0);
+      const WHITE = rgb(1, 1, 1);
+      const GRAY = rgb(0.5, 0.5, 0.5);
+      const GREEN = rgb(0.1, 0.65, 0.3);
+      const LIGHT_GREEN = rgb(0.9, 0.98, 0.92);
+      const LIGHT_GRAY = rgb(0.9, 0.9, 0.9);
+
+      const drawField = (label: string, value: string, yPos: number, isFilled = false): void => {
+        page.drawText(label, { x: MARGIN, y: yPos + 2, font, size: 8, color: GRAY });
+        page.drawRectangle({
+          x: MARGIN,
+          y: yPos - 16,
+          width: PAGE_WIDTH - MARGIN * 2,
+          height: 18,
+          color: isFilled ? LIGHT_GREEN : rgb(0.97, 0.97, 0.97),
+          borderColor: isFilled ? GREEN : LIGHT_GRAY,
+          borderWidth: isFilled ? 1 : 0.5,
+        });
+        page.drawText(value || "(not provided)", {
+          x: MARGIN + 6,
+          y: yPos - 10,
+          font: value ? bold : font,
+          size: 9,
+          color: value ? BLACK : GRAY,
+        });
+        if (isFilled && value) {
+          page.drawText("auto-filled", { x: PAGE_WIDTH - MARGIN - 55, y: yPos - 10, font, size: 7, color: GREEN });
+        }
+      };
+
+      page.drawRectangle({ x: 0, y: PAGE_HEIGHT - 80, width: PAGE_WIDTH, height: 80, color: rgb(0.05, 0.05, 0.05) });
+      page.drawText("LEMBAGA HASIL DALAM NEGERI MALAYSIA (LHDN)", {
+        x: MARGIN,
+        y: PAGE_HEIGHT - 35,
+        font: bold,
+        size: 13,
+        color: WHITE,
+      });
+      page.drawText("BORANG CP204 - ANGGARAN CUKAI YANG KENA DIBAYAR", {
+        x: MARGIN,
+        y: PAGE_HEIGHT - 55,
+        font,
+        size: 10,
+        color: rgb(0.7, 0.7, 0.7),
+      });
+
+      const f = body.fields;
+      const currentYear = new Date().getFullYear();
+      const estimatedTax = parseAmount(f.estimated_tax_payable);
+      const installment = estimatedTax !== null ? `RM ${(estimatedTax / 12).toFixed(2)}` : "";
+
+      let y = PAGE_HEIGHT - 130;
+      drawField("NAMA SYARIKAT", f.company_name || business.name || "", y, Boolean(f.company_name || business.name));
+      y -= 40;
+      drawField("NO. RUJUKAN CUKAI", f.tax_ref_no || "", y, Boolean(f.tax_ref_no));
+      y -= 40;
+      drawField("TARIKH MULA (PERIOD)", f.accounting_period_start || `01/01/${currentYear}`, y, true);
+      y -= 40;
+      drawField("TARIKH AKHIR (PERIOD)", f.accounting_period_end || `31/12/${currentYear}`, y, true);
+      y -= 40;
+      drawField("ANGGARAN CUKAI (RM)", f.estimated_tax_payable || "", y, Boolean(f.estimated_tax_payable));
+      y -= 40;
+      drawField("ANSURAN BULANAN (RM)", f.installment_amount || installment, y, Boolean(f.installment_amount || installment));
+      y -= 50;
+
+      page.drawRectangle({ x: MARGIN, y: y - 5, width: 220, height: 24, color: LIGHT_GREEN, borderColor: GREEN, borderWidth: 1 });
+      page.drawText(`Auto-filled by LULUS AI | ${t.display}`, {
+        x: MARGIN + 8,
+        y: y + 4,
+        font: bold,
+        size: 9,
+        color: rgb(0.05, 0.5, 0.2),
+      });
+
+      page.drawLine({ start: { x: MARGIN, y: 55 }, end: { x: PAGE_WIDTH - MARGIN, y: 55 }, thickness: 0.5, color: LIGHT_GRAY });
+      page.drawText("DRAFT ONLY - This is a pre-filled draft generated by LULUS AI for reference purposes.", {
+        x: MARGIN,
+        y: 42,
+        font: bold,
+        size: 8,
+        color: rgb(0.7, 0.3, 0.1),
+      });
+      page.drawText("Please verify all information before submitting to the relevant government authority.", {
+        x: MARGIN,
+        y: 30,
+        font,
+        size: 8,
+        color: GRAY,
+      });
+      page.drawText(`Generated on ${t.display} by LULUS AI`, {
+        x: MARGIN,
+        y: 18,
+        font,
+        size: 7,
+        color: GRAY,
+      });
+
+      pdfBytes = await pdfDoc.save();
+      filename = `LULUSAI_LHDN_CP204_${filenameSafe(business.name ?? "draft")}_${t.yyyy}${t.mm}${t.dd}.pdf`;
     }
 
-    page.drawRectangle({ x: 50, y: 108, width: 495, height: 24, color: rgb(0.9, 0.98, 0.92), borderColor: GREEN, borderWidth: 1 });
-    page.drawText(`Auto-filled by LULUS AI | ${date}`, { x: 58, y: 116, size: 10, font: bold, color: GREEN });
-
-    page.drawText("DRAFT ONLY - This is a pre-filled draft generated by LULUS AI for reference purposes.", {
-      x: 50,
-      y: 74,
-      size: 9,
-      font: bold,
-      color: ORANGE,
-    });
-    page.drawText("Please verify all information before submitting to the relevant government authority.", {
-      x: 50,
-      y: 60,
-      size: 8,
-      font,
-      color: rgb(0.35, 0.35, 0.35),
-    });
-    page.drawText(`Generated on ${date} by LULUS AI`, {
-      x: 50,
-      y: 48,
-      size: 8,
-      font,
-      color: rgb(0.35, 0.35, 0.35),
-    });
-
-    const bytes = await pdfDoc.save();
-
-    const safeName = String(business.name ?? "Business").replace(/[^a-zA-Z0-9_-]+/g, "_");
-    const filename =
-      body.form_type === "ssm"
-        ? `LULUSAI_SSM_BorangA_${safeName}_${date}.pdf`
-        : `LULUSAI_LHDN_CP204_${safeName}_${date}.pdf`;
-
-    const { error: saveError } = await supabase.from("form_submissions").insert({
+    const { error: insertError } = await supabase.from("form_submissions").insert({
       business_id: body.business_id,
       form_type: body.form_type,
       fields_used: body.fields,
       filename,
     });
 
-    if (saveError) {
-      return NextResponse.json({ error: saveError.message }, { status: 500 });
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
-    return new Response(Buffer.from(bytes), {
-      status: 200,
+    return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Length": String(pdfBytes.length),
       },
     });
   } catch (error) {
-    console.error("Form PDF generation failed:", error);
-    return NextResponse.json({ error: "Failed to generate form PDF" }, { status: 500 });
+    console.error("Form PDF error:", error);
+    const message = error instanceof Error ? error.message : "Failed to generate form PDF";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
