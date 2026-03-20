@@ -39,7 +39,6 @@ export default function AuthPage(): JSX.Element {
       setUser(currentUser);
       if (currentUser) {
         document.cookie = "cc_auth=1; Path=/; Max-Age=2592000; SameSite=Lax";
-        router.replace("/");
       }
     });
 
@@ -49,7 +48,6 @@ export default function AuthPage(): JSX.Element {
       setUser(session?.user ?? null);
       if (session?.user) {
         document.cookie = "cc_auth=1; Path=/; Max-Age=2592000; SameSite=Lax";
-        router.replace("/");
       }
     });
     return () => subscription.unsubscribe();
@@ -68,11 +66,30 @@ export default function AuthPage(): JSX.Element {
         const { error } = await supabase.auth.signUp({ email: authEmail.trim(), password: authPassword });
         if (error) throw error;
         setAuthMessage("Sign up success. Please verify email if your Supabase project requires confirmation.");
+        router.push("/onboard");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword });
+        const { data: signInData, error } = await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword });
         if (error) throw error;
         document.cookie = "cc_auth=1; Path=/; Max-Age=2592000; SameSite=Lax";
-        router.push("/");
+
+        const signedUser = signInData.user;
+        if (!signedUser) {
+          router.push("/onboard");
+          return;
+        }
+
+        const { data: business, error: businessError } = await supabase
+          .from("businesses")
+          .select("id")
+          .eq("user_id", signedUser.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (businessError) {
+          throw businessError;
+        }
+
+        router.push(business?.id ? "/dashboard" : "/onboard");
       }
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : "Authentication failed");

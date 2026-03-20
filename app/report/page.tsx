@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRM, getRiskColour, getStatusFromRisk, type ComplianceItem, type RiskData } from "@/lib/risk";
@@ -31,7 +32,10 @@ export default function ReportPage(): JSX.Element {
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [businessId, setBusinessId] = useState<string | null>(null);
 
   useEffect(() => {
     const businessId = localStorage.getItem("compliance_copilot_business_id");
@@ -40,6 +44,7 @@ export default function ReportPage(): JSX.Element {
       setLoading(false);
       return;
     }
+    setBusinessId(businessId);
 
     fetch(`/api/report?businessId=${businessId}`)
       .then(async (r) => {
@@ -61,28 +66,38 @@ export default function ReportPage(): JSX.Element {
     setTimeout(() => setToast(null), 2000);
   };
 
-  const downloadPdf = async (): Promise<void> => {
-    if (!report?.business?.id) return;
-    const res = await fetch("/api/report/generate-pdf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ businessId: report.business.id }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({ error: "Failed to generate PDF" }));
-      setError((data as { error?: string }).error ?? "Failed to generate PDF");
-      return;
+  const handleDownloadReport = async (): Promise<void> => {
+    if (!businessId) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const res = await fetch("/api/report/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ business_id: businessId }),
+      });
+
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({ error: "Failed to generate report" }))) as { error?: string };
+        throw new Error(err.error || "Failed to generate report");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const filename = res.headers.get("x-filename") ?? `LULUSAI_Compliance_Report_${Date.now()}.pdf`;
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Download failed. Please try again.";
+      setDownloadError(msg);
+    } finally {
+      setDownloading(false);
     }
-    const blob = await res.blob();
-    const name = res.headers.get("x-filename") ?? "Compliance_Report.pdf";
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -113,13 +128,26 @@ export default function ReportPage(): JSX.Element {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="outline" onClick={downloadPdf} className="border-neutral-700 text-neutral-200 hover:bg-neutral-800">
-                  Download PDF Report
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadReport}
+                  disabled={downloading}
+                  className="border-neutral-700 text-neutral-200 hover:bg-neutral-800 disabled:opacity-60"
+                >
+                  {downloading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating PDF...
+                    </span>
+                  ) : (
+                    "Download PDF Report"
+                  )}
                 </Button>
                 <Button onClick={copyLink} className="bg-blue-600 hover:bg-blue-700">
                   Share Report
                 </Button>
               </div>
+              {downloadError ? <p className="text-sm text-rose-400">{downloadError}</p> : null}
             </div>
           </CardHeader>
 
@@ -213,4 +241,3 @@ export default function ReportPage(): JSX.Element {
     </main>
   );
 }
-

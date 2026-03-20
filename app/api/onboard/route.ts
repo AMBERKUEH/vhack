@@ -64,7 +64,12 @@ async function extractBusinessProfile(prompt: string): Promise<Partial<BusinessP
 
 export async function POST(req: Request): Promise<NextResponse> {
   try {
-    const body = (await req.json()) as { prompt: string; email: string; userId?: string };
+    const body = (await req.json()) as {
+      prompt: string;
+      email: string;
+      userId?: string;
+      profile?: Partial<BusinessProfile>;
+    };
     if (!body?.prompt || !body?.email) {
       return NextResponse.json({ error: "prompt and email are required" }, { status: 400 });
     }
@@ -85,7 +90,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       channels: ["offline"],
     };
 
-    const extracted = await extractBusinessProfile(body.prompt);
+    const extracted = body.profile ?? (await extractBusinessProfile(body.prompt));
     if (extracted) {
       profile = {
         name: extracted.name ?? profile.name,

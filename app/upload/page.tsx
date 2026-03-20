@@ -98,7 +98,7 @@ export default function UploadPage(): JSX.Element {
   const [result, setResult] = useState<UploadResponse | null>(null);
   const [editable, setEditable] = useState<ExtractedData | null>(null);
   const [confirmErrors, setConfirmErrors] = useState(false);
-  const [downloading, setDownloading] = useState<"ssm" | "lhdn" | null>(null);
+  const [downloading, setDownloading] = useState<"ssm" | "lhdn-cp204" | null>(null);
   const [displayScore, setDisplayScore] = useState<{ from: number; to: number } | null>(null);
   const [choices, setChoices] = useState<ComplianceChoice[]>([]);
   const [selectedItemId, setSelectedItemId] = useState("");
@@ -199,9 +199,6 @@ export default function UploadPage(): JSX.Element {
   const hasBlockingErrors = result?.anomaly_flags.some((flag) => flag.severity === "error") ?? false;
   const canGenerate = Boolean(result && editable && (!hasBlockingErrors || confirmErrors));
   const authority = editable?.authority ?? "Unknown";
-  const showSSM = authority === "SSM" || authority === "Unknown";
-  const showLHDN = authority === "LHDN" || authority === "Unknown";
-
   const handleGenerateSsm = async (): Promise<void> => {
     if (!businessProfile || !editable || !canGenerate) return;
     setDownloading("ssm");
@@ -210,12 +207,17 @@ export default function UploadPage(): JSX.Element {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          form_type: "ssm-borang-a",
+          form_type: "ssm",
           business_id: businessProfile.id,
-          extracted_data: {
-            company_name: editable.company_name,
-            reg_no: editable.reg_no,
-            expiry_date: editable.expiry_date,
+          fields: {
+            nama_perniagaan: editable.company_name || "",
+            alamat: "",
+            no_mykad: editable.reg_no || "",
+            no_telefon: "",
+            jenis_perniagaan: businessProfile.type || "",
+            company_name: editable.company_name || "",
+            tax_ref_no: editable.reg_no || "",
+            estimated_tax_payable: String(editable.amount ?? ""),
           },
         }),
       });
@@ -224,7 +226,7 @@ export default function UploadPage(): JSX.Element {
         throw new Error((err as { error?: string }).error ?? "Failed to generate SSM form");
       }
       const blob = await res.blob();
-      const name = `SSM_BorangA_${editable.reg_no ?? "NA"}.pdf`;
+      const name = `LULUSAI_SSM_BorangA_${Date.now()}.pdf`;
       downloadBlob(blob, name);
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Failed to generate SSM form");
@@ -235,22 +237,34 @@ export default function UploadPage(): JSX.Element {
 
   const handleGenerateLhdn = async (): Promise<void> => {
     if (!businessProfile || !editable || !canGenerate) return;
-    setDownloading("lhdn");
+    setDownloading("lhdn-cp204");
     try {
       const res = await fetch("/api/forms/generate-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ form_type: "lhdn-cp204", business_id: businessProfile.id, extracted_data: editable }),
+        body: JSON.stringify({
+          form_type: "lhdn-cp204",
+          business_id: businessProfile.id,
+          fields: {
+            nama_perniagaan: editable.company_name || "",
+            alamat: "",
+            no_mykad: editable.reg_no || "",
+            no_telefon: "",
+            jenis_perniagaan: businessProfile.type || "",
+            company_name: editable.company_name || "",
+            tax_ref_no: editable.reg_no || "",
+            estimated_tax_payable: String(editable.amount ?? ""),
+          },
+        }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Failed to generate LHDN JSON" }));
-        throw new Error((err as { error?: string }).error ?? "Failed to generate LHDN JSON");
+        const err = await res.json().catch(() => ({ error: "Failed to generate LHDN CP204" }));
+        throw new Error((err as { error?: string }).error ?? "Failed to generate LHDN CP204");
       }
       const blob = await res.blob();
-      const invoiceNo = editable.invoice_no?.trim() || `CP204-${Date.now()}`;
-      downloadBlob(blob, `LHDN_CP204_${invoiceNo}.pdf`);
+      downloadBlob(blob, `LULUSAI_LHDN_CP204_${Date.now()}.pdf`);
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "Failed to generate LHDN JSON");
+      setUploadError(error instanceof Error ? error.message : "Failed to generate LHDN CP204");
     } finally {
       setDownloading(null);
     }
@@ -495,19 +509,23 @@ export default function UploadPage(): JSX.Element {
       {result && editable ? (
         <Card className="border-neutral-800 bg-neutral-950">
           <CardHeader>
-            <CardTitle className="text-white">Pre-fill your form</CardTitle>
+            <CardTitle className="text-white">Pre-fill your government forms</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-3">
-            {showSSM ? (
+          <CardContent className="space-y-3">
+            <p className="text-sm text-neutral-300">
+              Your document data has been extracted. Download a pre-filled draft to review before submitting.
+            </p>
+            <div className="flex flex-wrap gap-3">
               <Button disabled={!canGenerate || downloading !== null} onClick={handleGenerateSsm} className="bg-blue-600 hover:bg-blue-700">
-                {downloading === "ssm" ? "Generating..." : "Download Pre-filled SSM Borang A"}
+                {downloading === "ssm" ? "Generating..." : "Download SSM Borang A"}
               </Button>
-            ) : null}
-            {showLHDN ? (
               <Button disabled={!canGenerate || downloading !== null} onClick={handleGenerateLhdn} className="bg-violet-600 hover:bg-violet-700">
-                {downloading === "lhdn" ? "Generating..." : "Download Pre-filled LHDN CP204"}
+                {downloading === "lhdn-cp204" ? "Generating..." : "Download LHDN CP204"}
               </Button>
-            ) : null}
+            </div>
+            <p className="text-xs text-neutral-400">
+              Pre-filled drafts only. Always verify before submitting to the government portal.
+            </p>
             <Button asChild variant="outline" className="border-neutral-700 text-neutral-200">
               <Link href="/dashboard">Back to Dashboard</Link>
             </Button>

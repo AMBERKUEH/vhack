@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type User } from "@supabase/supabase-js";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { LiquidGlassButton } from "@/components/ui/liquid-glass-button";
@@ -73,7 +73,7 @@ function RiskGauge({ score, animated = true }: { score: number; animated?: boole
   }, [score, animated]);
 
   const fillLength = (displayScore / 100) * circumference;
-  const ring = getRiskColour(displayScore);
+  const ringHex = displayScore >= 70 ? "#dc2626" : displayScore >= 40 ? "#d97706" : "#16a34a";
 
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col items-center">
@@ -84,20 +84,20 @@ function RiskGauge({ score, animated = true }: { score: number; animated?: boole
           cy="110"
           r={radius}
           strokeWidth={strokeWidth}
-          stroke={ring.hex}
+          stroke={ringHex}
           fill="none"
           strokeLinecap="round"
           strokeDasharray={`${fillLength} ${circumference}`}
           transform="rotate(-90 110 110)"
         />
-        <text x="110" y="105" textAnchor="middle" className="fill-slate-900 text-4xl font-bold">
+        <text x="110" y="105" textAnchor="middle" className="fill-white text-4xl font-bold">
           {displayScore}
         </text>
-        <text x="110" y="130" textAnchor="middle" className="fill-slate-500 text-sm font-medium">
+        <text x="110" y="130" textAnchor="middle" className="fill-white text-sm font-medium">
           {getRiskLevel(displayScore)}
         </text>
       </svg>
-      <p className="-mt-2 text-sm font-medium text-slate-600">Overall Compliance Risk</p>
+      <p className="-mt-2 text-sm font-medium text-neutral-300">Overall Compliance Risk</p>
     </div>
   );
 }
@@ -153,6 +153,7 @@ export default function DashboardPage(): JSX.Element {
   const [grants, setGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [businessName, setBusinessName] = useState("-");
 
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -161,25 +162,17 @@ export default function DashboardPage(): JSX.Element {
     return createClient(url, anon);
   }, []);
 
-  const resolveBusinessIdFromLocal = (): string | null => {
-    const explicit = localStorage.getItem("compliance_copilot_business_id");
-    if (explicit) return explicit;
-    const raw = localStorage.getItem("cc_business");
-    if (!raw) return null;
-    try {
-      return (JSON.parse(raw) as { id?: string }).id ?? null;
-    } catch {
+  const resolveBusinessId = async (): Promise<{ businessId: string; user: User } | null> => {
+    if (!supabase) throw new Error("Supabase browser client is not configured.");
+
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData.user;
+    if (!user) {
+      router.replace("/auth");
       return null;
     }
-  };
 
-  const resolveBusinessId = async (): Promise<string | null> => {
-    if (!supabase) return resolveBusinessIdFromLocal();
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
-    if (!user?.email) return resolveBusinessIdFromLocal();
-
-    const byUserId = await supabase
+    const businessRes = await supabase
       .from("businesses")
       .select("id, name")
       .eq("user_id", user.id)
@@ -187,25 +180,20 @@ export default function DashboardPage(): JSX.Element {
       .limit(1)
       .maybeSingle();
 
-    let business = byUserId.data;
-    if (!business) {
-      const byEmail = await supabase
-        .from("businesses")
-        .select("id, name")
-        .eq("owner_email", user.email)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      business = byEmail.data;
+    if (businessRes.error) {
+      throw businessRes.error;
     }
 
-    if (business?.id) {
-      localStorage.setItem("compliance_copilot_business_id", business.id);
-      localStorage.setItem("compliance_copilot_business_name", business.name ?? "-");
-      return business.id;
+    if (!businessRes.data?.id) {
+      router.replace("/onboard");
+      return null;
     }
 
-    return resolveBusinessIdFromLocal();
+    localStorage.setItem("compliance_copilot_business_id", businessRes.data.id);
+    localStorage.setItem("compliance_copilot_business_name", businessRes.data.name ?? "-");
+    setBusinessName(businessRes.data.name ?? "-");
+
+    return { businessId: businessRes.data.id, user };
   };
 
   const fetchDashboardData = async (businessId: string): Promise<void> => {
@@ -229,17 +217,17 @@ export default function DashboardPage(): JSX.Element {
   useEffect(() => {
     let mounted = true;
     resolveBusinessId()
-      .then((businessId) => {
-        if (!businessId) {
-          throw new Error("No business found. Please complete onboarding first.");
+      .then((resolved) => {
+        if (!resolved) {
+          return;
         }
 
         return Promise.all([
-          fetchDashboardData(businessId),
+          fetchDashboardData(resolved.businessId),
           fetch("/api/cron/check_alerts", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ businessId }),
+            body: JSON.stringify({ businessId: resolved.businessId }),
           }).catch(() => {}),
         ]);
       })
@@ -260,9 +248,9 @@ export default function DashboardPage(): JSX.Element {
   useEffect(() => {
     const onRiskUpdated = (): void => {
       resolveBusinessId()
-        .then((businessId) => {
-          if (!businessId) return;
-          return fetchDashboardData(businessId);
+        .then((resolved) => {
+          if (!resolved) return;
+          return fetchDashboardData(resolved.businessId);
         })
         .catch((err) => {
           console.error("Realtime refresh failed:", err);
@@ -278,10 +266,6 @@ export default function DashboardPage(): JSX.Element {
   }, []);
 
   const topGrant = useMemo(() => grants[0], [grants]);
-  const businessName = useMemo(() => {
-    if (typeof window === "undefined") return "-";
-    return localStorage.getItem("compliance_copilot_business_name") ?? "-";
-  }, []);
 
   const handleLogout = async (): Promise<void> => {
     if (!supabase) {
@@ -433,14 +417,14 @@ export default function DashboardPage(): JSX.Element {
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-neutral-900/95 p-3 backdrop-blur md:static md:border-none md:bg-transparent md:p-0">
         <div className="mx-auto grid max-w-4xl grid-cols-3 gap-2 md:grid-cols-3">
-          <LiquidGlassButton variant="primary" className="w-full">
-            <Link href="/upload" className="flex items-center justify-center w-full">Upload Document</Link>
+          <LiquidGlassButton variant="primary" className="w-full" onClick={() => router.push("/upload")}>
+            Upload Document
           </LiquidGlassButton>
-          <LiquidGlassButton variant="outline" className="w-full">
-            <Link href="/alerts" className="flex items-center justify-center w-full">Set Alerts</Link>
+          <LiquidGlassButton variant="outline" className="w-full" onClick={() => router.push("/forms/ssm-renewal")}>
+            Autofill Forms
           </LiquidGlassButton>
-          <LiquidGlassButton variant="outline" className="w-full">
-            <Link href="/report" className="flex items-center justify-center w-full">View Report</Link>
+          <LiquidGlassButton variant="outline" className="w-full" onClick={() => router.push("/report")}>
+            Download Report
           </LiquidGlassButton>
         </div>
       </nav>

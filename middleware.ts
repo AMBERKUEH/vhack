@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 function isPublicPath(pathname: string): boolean {
+  if (pathname === "/") return true;
   return (
     pathname.startsWith("/auth") ||
     pathname.startsWith("/api") ||
@@ -20,6 +21,10 @@ function hasSupabaseSessionCookie(req: NextRequest): boolean {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (isPublicPath(pathname)) return NextResponse.next();
+
+  const protectedPrefixes = ["/onboard", "/dashboard", "/upload", "/chat", "/report", "/alerts", "/copilot"];
+  const isProtected = protectedPrefixes.some((prefix) => pathname.startsWith(prefix));
+  if (!isProtected) return NextResponse.next();
 
   if (!hasSupabaseSessionCookie(req)) {
     const url = req.nextUrl.clone();
