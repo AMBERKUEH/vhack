@@ -152,8 +152,10 @@ export default function DashboardPage(): JSX.Element {
   const [riskData, setRiskData] = useState<RiskData | null>(null);
   const [grants, setGrants] = useState<Grant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState("-");
+  const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
 
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -192,6 +194,7 @@ export default function DashboardPage(): JSX.Element {
     localStorage.setItem("compliance_copilot_business_id", businessRes.data.id);
     localStorage.setItem("compliance_copilot_business_name", businessRes.data.name ?? "-");
     setBusinessName(businessRes.data.name ?? "-");
+    setCurrentBusinessId(businessRes.data.id);
 
     return { businessId: businessRes.data.id, user };
   };
@@ -212,6 +215,25 @@ export default function DashboardPage(): JSX.Element {
     setRiskData(risk);
     setGrants(grantData);
     setError(null);
+  };
+
+  const refreshDashboardData = async (): Promise<void> => {
+    try {
+      setRefreshing(true);
+      const businessId = currentBusinessId ?? localStorage.getItem("compliance_copilot_business_id");
+      if (!businessId) {
+        const resolved = await resolveBusinessId();
+        if (!resolved) return;
+        await fetchDashboardData(resolved.businessId);
+        return;
+      }
+      await fetchDashboardData(businessId);
+    } catch (err) {
+      console.error("Dashboard refresh failed:", err);
+      setError(err instanceof Error ? err.message : "Unable to refresh dashboard.");
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -247,11 +269,7 @@ export default function DashboardPage(): JSX.Element {
 
   useEffect(() => {
     const onRiskUpdated = (): void => {
-      resolveBusinessId()
-        .then((resolved) => {
-          if (!resolved) return;
-          return fetchDashboardData(resolved.businessId);
-        })
+      refreshDashboardData()
         .catch((err) => {
           console.error("Realtime refresh failed:", err);
         });
@@ -263,7 +281,17 @@ export default function DashboardPage(): JSX.Element {
       window.removeEventListener("compliance-risk-updated", onRiskUpdated);
       window.removeEventListener("storage", onRiskUpdated);
     };
-  }, []);
+  }, [currentBusinessId]);
+
+  useEffect(() => {
+    const handleFocus = (): void => {
+      refreshDashboardData().catch((err) => {
+        console.error("Focus refresh failed:", err);
+      });
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [currentBusinessId]);
 
   const topGrant = useMemo(() => grants[0], [grants]);
 
@@ -310,7 +338,14 @@ export default function DashboardPage(): JSX.Element {
         </Card>
       ) : (
         <>
-          <RiskGauge score={riskData.overall_score} animated />
+          <div className="space-y-3">
+            <RiskGauge score={riskData.overall_score} animated />
+            <div className="flex justify-center">
+              <LiquidGlassButton variant="outline" onClick={refreshDashboardData} disabled={refreshing}>
+                {refreshing ? "Updating..." : "↻ Refresh"}
+              </LiquidGlassButton>
+            </div>
+          </div>
 
           <section className="grid gap-4 md:grid-cols-3">
             <Card className="bg-neutral-900 border-neutral-800">

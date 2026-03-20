@@ -71,6 +71,27 @@ function sanitizeJson(text: string): string {
   return text.replace(/```json|```/g, "").trim();
 }
 
+function parseGeminiJson(text: string): Partial<ExtractedData> {
+  const cleaned = sanitizeJson(text);
+  const candidates: string[] = [cleaned];
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(cleaned.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    const normalized = candidate.replace(/,\s*([}\]])/g, "$1");
+    try {
+      return JSON.parse(normalized) as Partial<ExtractedData>;
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error("Failed to parse OCR JSON response.");
+}
+
 function isSupportedMime(mime: string): boolean {
   return ["application/pdf", "image/jpeg", "image/jpg", "image/png"].includes(mime.toLowerCase());
 }
@@ -151,10 +172,6 @@ export async function POST(req: Request): Promise<NextResponse> {
     if (!hasSupabaseEnv) {
       return NextResponse.json({ error: "Supabase environment variables are missing." }, { status: 500 });
     }
-    if (!process.env.GOOGLE_AI_API_KEY) {
-      return NextResponse.json({ error: "GOOGLE_AI_API_KEY is missing." }, { status: 500 });
-    }
-
     const formData = await req.formData();
     const file = formData.get("file");
     const businessId = String(formData.get("business_id") ?? formData.get("businessId") ?? "");
@@ -176,20 +193,52 @@ export async function POST(req: Request): Promise<NextResponse> {
 
     const oldItems = await getScoredItems(businessId);
     const oldScore = getOverallScore(oldItems);
+    const oldPenalty = getPenaltyExposure(oldItems);
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64Data = buffer.toString("base64");
 
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result = await model.generateContent([
-      { inlineData: { mimeType: file.type, data: base64Data } },
-      OCR_PROMPT,
-    ]);
-    const text = result.response.text();
-    const extracted = normalizeExtracted(JSON.parse(sanitizeJson(text)) as Partial<ExtractedData>);
+    let extracted: ExtractedData;
+    const anomalyFlags: AnomalyFlag[] = [];
 
-    const anomalyFlags: AnomalyFlag[] = await detectAnomalies(extracted, business.name, supabase, businessId);
+    try {
+      if (!process.env.GOOGLE_AI_API_KEY) {
+        throw new Error("GOOGLE_AI_API_KEY is missing.");
+      }
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const result = await model.generateContent([
+        { inlineData: { mimeType: file.type, data: base64Data } },
+        OCR_PROMPT,
+      ]);
+      const text = result.response.text();
+      extracted = normalizeExtracted(parseGeminiJson(text));
+    } catch (ocrError) {
+      console.warn("Primary OCR failed, using fallback extraction:", ocrError);
+      extracted = normalizeExtracted({
+        document_type: file.name.toLowerCase().includes("ssm") ? "SSM Certificate" : "Unknown",
+        company_name: business.name ?? null,
+        reg_no: null,
+        issue_date: null,
+        expiry_date: null,
+        authority: "Unknown",
+        amount: null,
+        invoice_no: null,
+        supplier_name: null,
+        supplier_tin: null,
+        msic_code: null,
+        total_amount: null,
+        tax_amount: null,
+      });
+      anomalyFlags.push({
+        code: "OCR_FALLBACK",
+        message: "OCR fallback mode used. Please review extracted fields carefully.",
+        severity: "warning",
+      });
+    }
+
+    const detectedFlags = await detectAnomalies(extracted, business.name, supabase, businessId);
+    anomalyFlags.push(...detectedFlags);
 
     let matchedItem: { id: string; deadline: string | null } | null = null;
     let matchError: { message: string } | null = null;
@@ -222,29 +271,17 @@ export async function POST(req: Request): Promise<NextResponse> {
     const linkedItemId = matchedItem?.id ?? null;
 
     if (linkedItemId) {
-      const expiry = extracted.expiry_date;
-      const updateWithExpiry = await supabase
+      const { error: updateError } = await supabase
         .from("compliance_items")
         .update({
           document_uploaded: true,
+          expiry_date: extracted.expiry_date || null,
           status: "uploaded",
-          expiry_date: expiry,
-          deadline: expiry ?? matchedItem?.deadline ?? null,
         })
         .eq("id", linkedItemId);
 
-      if (updateWithExpiry.error) {
-        const fallbackUpdate = await supabase
-          .from("compliance_items")
-          .update({
-            document_uploaded: true,
-            status: "uploaded",
-            deadline: expiry ?? matchedItem?.deadline ?? null,
-          })
-          .eq("id", linkedItemId);
-        if (fallbackUpdate.error) {
-          return NextResponse.json({ error: fallbackUpdate.error.message }, { status: 500 });
-        }
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
       }
     }
 
@@ -267,7 +304,9 @@ export async function POST(req: Request): Promise<NextResponse> {
 
     const newItems = await getScoredItems(businessId);
     const newScore = getOverallScore(newItems);
-    const penaltyExposure = getPenaltyExposure(newItems);
+    const newPenalty = getPenaltyExposure(newItems);
+    const newItemsAtRisk = newItems.filter((item) => getItemRisk(item) >= 50).length;
+    const totalItems = newItems.length;
 
     await Promise.all(
       newItems.map((item) =>
@@ -281,15 +320,13 @@ export async function POST(req: Request): Promise<NextResponse> {
       ),
     );
 
-    if (newScore !== oldScore) {
-      await supabase.from("risk_events").insert({
-        business_id: businessId,
-        event_type: "document_upload",
-        old_score: oldScore,
-        new_score: newScore,
-        description: `Risk changed after document upload (${file.name})`,
-      });
-    }
+    await supabase.from("risk_events").insert({
+      business_id: businessId,
+      event_type: "DOCUMENT_UPLOADED",
+      old_score: oldScore,
+      new_score: newScore,
+      description: `Uploaded document for ${linkedItemId ? oldItems.find((item) => item.id === linkedItemId)?.name ?? file.name : file.name}`,
+    });
 
     return NextResponse.json({
       success: true,
@@ -302,10 +339,15 @@ export async function POST(req: Request): Promise<NextResponse> {
       old_score: oldScore,
       new_score: newScore,
       score_dropped_by: Math.max(0, oldScore - newScore),
-      penalty_exposure: penaltyExposure,
+      penalty_exposure: newPenalty,
+      old_penalty: oldPenalty,
+      new_penalty: newPenalty,
+      items_at_risk: newItemsAtRisk,
+      total_items: totalItems,
     });
   } catch (error) {
     console.error("/api/upload failed", error);
-    return NextResponse.json({ error: "Upload processing failed" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Upload processing failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

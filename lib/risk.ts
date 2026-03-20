@@ -123,7 +123,7 @@ export function getOverallScore(items: ComplianceItem[]): number {
  */
 export function getPenaltyExposure(items: ComplianceItem[]): number {
   return items
-    .filter((item) => item.risk_score >= 80)
+    .filter((item) => getItemRisk(item) >= 80)
     .reduce((sum, item) => sum + item.penalty_rm_min, 0);
 }
 
@@ -206,7 +206,7 @@ export function buildRiskData(items: ComplianceItem[]): RiskData {
     overall_score,
     risk_level: getRiskLevel(overall_score),
     penalty_exposure: getPenaltyExposure(items),
-    items_at_risk: items.filter((item) => item.risk_score >= 80).length,
+    items_at_risk: items.filter((item) => getItemRisk(item) >= 50).length,
     next_deadline: getNextDeadline(items),
     items,
     forecast: getForecast(items),

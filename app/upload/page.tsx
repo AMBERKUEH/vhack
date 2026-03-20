@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { formatRM } from "@/lib/risk";
+import ReceiptToMyInvoisTab from "@/components/receipt-to-myinvois-tab";
 
 type Authority = "SSM" | "LHDN" | "Unknown";
+type ActiveTab = "compliance" | "myinvois";
 
 type ExtractedData = {
   document_type: string;
@@ -43,6 +45,10 @@ type UploadResponse = {
   new_score: number;
   score_dropped_by: number;
   penalty_exposure: number;
+  old_penalty?: number;
+  new_penalty?: number;
+  items_at_risk?: number;
+  total_items?: number;
 };
 
 type BusinessProfile = {
@@ -77,27 +83,42 @@ function toNumberOrNull(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parseBusinessProfile(): BusinessProfile | null {
-  const raw = localStorage.getItem("cc_business");
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<BusinessProfile>;
-    if (!parsed.id) return null;
-    return {
-      id: parsed.id,
-      name: parsed.name ?? "",
-      location: parsed.location ?? "",
-      type: parsed.type ?? "",
-      council: parsed.council ?? "",
-      state: parsed.state ?? "",
-    };
-  } catch {
-    return null;
+function resolveBusinessProfile(): BusinessProfile | null {
+  const rawBusiness = localStorage.getItem("cc_business");
+  if (rawBusiness) {
+    try {
+      const parsed = JSON.parse(rawBusiness) as Partial<BusinessProfile>;
+      if (parsed.id) {
+        return {
+          id: parsed.id,
+          name: parsed.name ?? "",
+          location: parsed.location ?? "",
+          type: parsed.type ?? "",
+          council: parsed.council ?? "",
+          state: parsed.state ?? "",
+        };
+      }
+    } catch {
+      // ignore parse errors and try fallback keys
+    }
   }
+
+  const fallbackId = localStorage.getItem("compliance_copilot_business_id");
+  if (!fallbackId) return null;
+
+  return {
+    id: fallbackId,
+    name: localStorage.getItem("compliance_copilot_business_name") ?? "",
+    location: "",
+    type: "",
+    council: "",
+    state: "",
+  };
 }
 
 export default function UploadPage(): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>("compliance");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -109,10 +130,21 @@ export default function UploadPage(): JSX.Element {
   const [displayScore, setDisplayScore] = useState<{ from: number; to: number } | null>(null);
   const [choices, setChoices] = useState<ComplianceChoice[]>([]);
   const [selectedItemId, setSelectedItemId] = useState("");
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [riskScore, setRiskScore] = useState<number | null>(null);
+  const [penaltyExposure, setPenaltyExposure] = useState<number | null>(null);
+  const [itemsAtRisk, setItemsAtRisk] = useState<number | null>(null);
+  const [totalItems, setTotalItems] = useState<number | null>(null);
 
-  const businessProfile = useMemo<BusinessProfile | null>(() => {
-    if (typeof window === "undefined") return null;
-    return parseBusinessProfile();
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile | null>(null);
+
+  useEffect(() => {
+    const load = (): void => {
+      setBusinessProfile(resolveBusinessProfile());
+    };
+    load();
+    window.addEventListener("storage", load);
+    return () => window.removeEventListener("storage", load);
   }, []);
 
   useEffect(() => {
@@ -141,7 +173,7 @@ export default function UploadPage(): JSX.Element {
 
   const runUpload = async (): Promise<void> => {
     if (!file || !businessProfile?.id) {
-      setUploadError("Please select a file and make sure business profile exists.");
+      setUploadError("Please select a file and complete onboarding first so a business profile is available.");
       return;
     }
 
@@ -151,6 +183,7 @@ export default function UploadPage(): JSX.Element {
     setResult(null);
     setEditable(null);
     setConfirmErrors(false);
+    setSuccessMessage(null);
 
     const progressTimer = window.setInterval(() => {
       setProgress((prev) => Math.min(92, prev + 7));
@@ -173,6 +206,16 @@ export default function UploadPage(): JSX.Element {
       setResult(data);
       setEditable(data.extracted_data);
       setProgress(100);
+      const oldPenalty = data.old_penalty ?? data.penalty_exposure;
+      const newPenalty = data.new_penalty ?? data.penalty_exposure;
+      const penaltyDelta = Math.max(0, oldPenalty - newPenalty);
+      setSuccessMessage(
+        `Document saved - Risk score dropped from ${data.old_score} to ${data.new_score}. Penalty exposure reduced by RM ${penaltyDelta.toLocaleString("en-MY")}. Items at risk: ${data.items_at_risk ?? 0} of ${data.total_items ?? 0}.`,
+      );
+      setRiskScore(data.new_score);
+      setPenaltyExposure(newPenalty);
+      setItemsAtRisk(data.items_at_risk ?? null);
+      setTotalItems(data.total_items ?? null);
 
       localStorage.setItem(
         "cc_latest_risk_snapshot",
@@ -312,6 +355,30 @@ export default function UploadPage(): JSX.Element {
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-4 py-8">
+      <div className="grid grid-cols-2 gap-2 rounded-lg border border-neutral-800 bg-neutral-950 p-1">
+        <button
+          type="button"
+          onClick={() => setActiveTab("compliance")}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+            activeTab === "compliance" ? "bg-blue-600 text-white" : "text-neutral-300 hover:bg-neutral-900"
+          }`}
+        >
+          📄 Compliance Documents
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("myinvois")}
+          className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+            activeTab === "myinvois" ? "bg-blue-600 text-white" : "text-neutral-300 hover:bg-neutral-900"
+          }`}
+        >
+          🧾 Receipt to MyInvois
+        </button>
+      </div>
+
+      {activeTab === "myinvois" ? <ReceiptToMyInvoisTab /> : null}
+      {activeTab === "compliance" ? (
+        <>
       <Card className="border-neutral-800 bg-neutral-950">
         <CardHeader>
           <CardTitle className="text-white">Upload Document</CardTitle>
@@ -533,12 +600,21 @@ export default function UploadPage(): JSX.Element {
               <CheckCircle2 className="h-5 w-5" />
               <p className="text-lg font-semibold">Risk dropped from {displayScore.from} to {displayScore.to}</p>
             </div>
-            <p className="text-sm text-emerald-200">
-              Penalty exposure now {formatRM(result?.penalty_exposure ?? 0)}
-            </p>
+            <p className="text-sm text-emerald-200">Penalty exposure now {formatRM(penaltyExposure ?? result?.penalty_exposure ?? 0)}</p>
             <p className="text-sm text-emerald-200">
               Score dropped by {result?.score_dropped_by ?? 0} points
             </p>
+            {riskScore !== null && itemsAtRisk !== null && totalItems !== null ? (
+              <p className="text-sm text-emerald-200">Items at risk: {itemsAtRisk} of {totalItems} (current score: {riskScore})</p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {successMessage ? (
+        <Card className="border-emerald-700 bg-emerald-950/40">
+          <CardContent className="p-4 text-sm text-emerald-200">
+            <p>✓ {successMessage}</p>
           </CardContent>
         </Card>
       ) : null}
@@ -571,6 +647,8 @@ export default function UploadPage(): JSX.Element {
             </Button>
           </CardContent>
         </Card>
+      ) : null}
+        </>
       ) : null}
     </main>
   );
