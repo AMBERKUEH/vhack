@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin, hasSupabaseEnv } from "@/lib/supabase";
+import { sendEmail } from "@/lib/mailer";
 
 type SendBody = {
   businessId: string;
@@ -11,28 +12,6 @@ function daysUntil(dateStr: string | null): number | null {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return null;
   return Math.ceil((d.getTime() - Date.now()) / 86400000);
-}
-
-async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL || "Compliance Copilot <onboarding@resend.dev>";
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY is missing");
-  }
-
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to, subject, html }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Resend error: ${text}`);
-  }
 }
 
 export async function POST(req: Request): Promise<NextResponse> {

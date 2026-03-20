@@ -233,7 +233,15 @@ export default function DashboardPage(): JSX.Element {
         if (!businessId) {
           throw new Error("No business found. Please complete onboarding first.");
         }
-        return fetchDashboardData(businessId);
+
+        return Promise.all([
+          fetchDashboardData(businessId),
+          fetch("/api/cron/check_alerts", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ businessId }),
+          }).catch(() => {}),
+        ]);
       })
       .catch((err) => {
         console.error("Dashboard fetch failed:", err);
